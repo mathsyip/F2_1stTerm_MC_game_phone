@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>中二數學第一學期訓練員</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #050510;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+        canvas { display: block; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .pointer-events-auto { pointer-events: auto; }
+        
+        /* 動態浮動搖桿樣式 */
+        #joystick-ui { position: absolute; z-index: 20; pointer-events: none; width: 100%; height: 100%; top: 0; left: 0; display: none; }
+        .joystick-base { width: 140px; height: 140px; background: rgba(0, 255, 255, 0.05); border: 2px solid rgba(0, 255, 255, 0.2); border-radius: 50%; position: absolute; transform: translate(-50%, -50%); }
+        .joystick-stick { width: 60px; height: 60px; background: rgba(0, 255, 255, 0.5); border-radius: 50%; position: absolute; transform: translate(-50%, -50%); box-shadow: 0 0 15px cyan; transition: transform 0.05s ease-out; }
+        
+        .neon-btn { background: transparent; color: #0ff; border: 2px solid #0ff; box-shadow: 0 0 10px #0ff, inset 0 0 10px #0ff; transition: all 0.2s; text-transform: uppercase; letter-spacing: 2px; }
+        .neon-btn:hover { background: #0ff; color: #000; box-shadow: 0 0 20px #0ff, inset 0 0 20px #0ff; }
+        #exp-bar-container { width: 100%; height: 10px; background: #222; position: absolute; top: 0; left: 0; box-shadow: 0 0 10px rgba(0,255,255,0.2); }
+        #exp-bar { width: 0%; height: 100%; background: linear-gradient(90deg, #ff0055 0%, #ffaa00 50%, #00f2fe 100%); box-shadow: 0 0 15px #ffaa00; transition: width 0.1s linear; }
+        .fade-in { animation: fadeIn 0.3s forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .pulse-text { animation: pulseText 1.5s infinite alternate; }
+        @keyframes pulseText { from { text-shadow: 0 0 10px #f0f, 0 0 20px #f0f; } to { text-shadow: 0 0 20px #f0f, 0 0 40px #f0f; } }
+        
+        /* 放大所有數學算式 */
+        .katex { font-size: 1.5em !important; }
+        .katex-display { margin: 0.2em 0 !important; }
+        
+        /* 針對手機版面的捲動隱藏卷軸 (美觀) */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 隱藏的浮動搖桿 UI -->
+    <div id="joystick-ui">
+        <div class="joystick-base" id="joystick-base"></div>
+        <div class="joystick-stick" id="joystick-stick"></div>
+    </div>
+
+    <div id="ui-layer" class="flex flex-col justify-between">
+        <div class="w-full relative">
+            <div id="exp-bar-container"><div id="exp-bar"></div></div>
+            <div class="flex justify-between items-start px-6 pt-5 text-white font-bold text-xl drop-shadow-md">
+                <div class="bg-black/50 px-3 py-1 rounded border border-cyan-500/50 flex items-center">
+                    <span class="text-cyan-400">
+                        <span id="lbl-level-desktop" class="hidden md:inline">系統評級</span>
+                        <span id="lbl-level-mobile" class="inline md:hidden">等級</span> 
+                        <span id="ui-level" class="ml-1">1</span>
+                    </span>
+                </div>
+                
+                <div class="flex flex-col items-center gap-2">
+                    <div class="text-3xl tracking-widest text-center" id="ui-timer" style="text-shadow: 0 0 10px white;">00:00</div>
+                    <div class="flex gap-3 bg-black/60 px-4 py-2 rounded-lg border border-gray-700/80 backdrop-blur-sm">
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-cyan-300">☄️ <span id="lbl-meteor">流星</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-meteor" class="h-full bg-cyan-400 w-0 transition-all duration-300 shadow-[0_0_5px_#00ffff]"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-fuchsia-400">⚡ <span id="lbl-lightning">閃চ্ছ</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-lightning" class="h-full bg-fuchsia-500 w-0 transition-all duration-300 shadow-[0_0_5px_#f0f]"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-orange-400">🔥 <span id="lbl-firestorm">火燒</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-firestorm" class="h-full bg-orange-500 w-0 transition-all duration-300 shadow-[0_0_5px_#ff4500]"></div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-center gap-1 w-14">
+                            <span class="text-xs text-yellow-300">💥 <span id="lbl-shockwave">衝擊波</span></span>
+                            <div class="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                <div id="progress-shockwave" class="h-full bg-yellow-400 w-0 transition-all duration-300 shadow-[0_0_5px_#ffee00]"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-right bg-black/50 px-3 py-1 rounded border border-red-500/50">
+                    <span class="text-red-400"><span id="ui-hp">100</span> / <span id="ui-maxhp">100</span> HP</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute top-24 right-6 text-white text-lg font-mono bg-black/50 px-3 py-1 rounded border border-fuchsia-500/50" style="text-shadow: 0 0 5px #ff00ff;">
+            KILLS: <span id="ui-kills">0</span>
+        </div>
+    </div>
+
+    <div id="modal-container" class="absolute inset-0 bg-black/85 flex items-center justify-center pointer-events-auto z-50 flex-col backdrop-blur-md">
+        
+        <!-- 開始畫面 -->
+        <div id="start-screen" class="text-center p-8 bg-gray-900/90 border-2 border-cyan-500 rounded-xl shadow-[0_0_40px_rgba(0,255,255,0.4)] max-w-lg mx-4">
+            <h1 id="main-title-text" class="text-4xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 mb-2 leading-tight" style="filter: drop-shadow(0 0 15px cyan);">遊戲標題</h1>
+            <p id="sub-title-text" class="text-cyan-200 mb-6 text-lg tracking-widest">GAME SUBTITLE</p>
+            <div class="text-sm text-gray-300 mb-8 text-left bg-black/60 p-5 rounded-lg border border-gray-700 space-y-2">
+                <p>🕒 <strong>生存目標：</strong>生存 10 分鐘，解開知識封印。</p>
+                <p>🔫 <strong>武器系統：</strong>每升 2 級提升子彈傷害與發射頻率。</p>
+                <p>⚡ <strong>心智試煉：</strong>每 5 秒強制觸發，30 秒自由挑戰 3 張卡牌。</p>
+                <p class="text-yellow-400 font-bold border-l-4 border-yellow-400 pl-2 mt-2">💥 3/3 答對滿分可選擇補血或觸發 2 秒暴風衝擊波！</p>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-4 w-full">
+                <button id="btn-start-zh" class="neon-btn px-6 py-4 text-lg font-bold rounded cursor-pointer flex-1">繁體中文</button>
+                <button id="btn-start-en" class="neon-btn px-6 py-4 text-lg font-bold rounded cursor-pointer flex-1 !border-fuchsia-500 !text-fuchsia-400 hover:!bg-fuchsia-500 hover:!text-white shadow-[0_0_10px_#f0f,inset_0_0_10px_#f0f]">ENGLISH</button>
+            </div>
+        </div>
+
+        <!-- 試煉畫面 (採用容器結構讓內部可垂直捲動) -->
+        <div id="levelup-screen" class="hidden w-[98%] max-w-7xl">
+            <div class="flex flex-col max-h-[95vh] text-center p-4 md:p-6 bg-gray-900/95 border-2 border-fuchsia-500 rounded-xl shadow-[0_0_50px_rgba(255,0,255,0.4)] relative">
+                <h2 id="lbl-quiz-title" class="text-3xl md:text-4xl font-black text-fuchsia-400 mb-1 tracking-widest pulse-text shrink-0">心智試煉 LEVEL UP!</h2>
+                <p id="lbl-quiz-desc" class="text-gray-300 mb-4 text-sm md:text-base shrink-0">30秒內選出正確概念步驟！向下滑動作答，三題全對可選擇特殊神技獎勵！</p>
+                
+                <div id="quiz-timer-container" class="w-full bg-gray-800 h-3 rounded-full mb-4 overflow-hidden border border-gray-600 relative shrink-0">
+                    <div id="quiz-timer-bar" class="h-full bg-gradient-to-r from-fuchsia-600 to-pink-500 w-full transition-all duration-1000 ease-linear"></div>
+                    <div id="quiz-timer-text" class="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-md">30s</div>
+                </div>
+
+                <!-- 手機版：向下滑動；iPad/電腦版：橫向並排 -->
+                <div id="quiz-cards-container" class="flex flex-col md:flex-row gap-6 md:gap-4 w-full justify-start md:justify-center overflow-y-auto md:overflow-y-visible flex-1 p-2 snap-y snap-mandatory scroll-smooth hide-scrollbar pb-10 md:pb-2"></div>
+                
+                <!-- 滿分 3/3 獎勵選擇彈窗 -->
+                <div id="perfect-reward-overlay" class="hidden absolute inset-0 bg-gray-900 rounded-xl flex flex-col items-center justify-center p-6 z-30 fade-in border-4 border-yellow-500">
+                    <h3 class="text-3xl md:text-4xl font-black text-yellow-400 mb-2 drop-shadow-[0_0_15px_rgba(234,179,8,0.8)]">🎉 PERFECT! 3/3 全對獎勵 🎉</h3>
+                    <p class="text-gray-200 mb-6 text-base md:text-lg" id="lbl-perfect-desc">請選擇你的試煉回報：</p>
+                    <div class="flex flex-col sm:flex-row gap-6 w-full max-w-md">
+                        <button id="btn-reward-heal" class="flex-1 p-5 bg-gradient-to-br from-green-900/80 to-emerald-900/80 border-2 border-green-400 rounded-xl hover:scale-105 transition-transform flex flex-col items-center shadow-[0_0_20px_rgba(74,222,128,0.4)] cursor-pointer">
+                            <span class="text-4xl mb-2">💖</span>
+                            <span class="text-xl font-bold text-green-300" id="lbl-heal-title">回復 20 生命值</span>
+                            <span class="text-xs text-green-200/80 mt-1" id="lbl-heal-sub">Restore +20 HP</span>
+                        </button>
+                        <button id="btn-reward-shockwave" class="flex-1 p-5 bg-gradient-to-br from-yellow-900/80 to-amber-900/80 border-2 border-yellow-400 rounded-xl hover:scale-105 transition-transform flex flex-col items-center shadow-[0_0_20px_rgba(250,204,21,0.4)] cursor-pointer">
+                            <span class="text-4xl mb-2">💥</span>
+                            <span class="text-xl font-bold text-yellow-300" id="lbl-shockwave-title">2秒暴風衝擊波</span>
+                            <span class="text-xs text-yellow-200/80 mt-1" id="lbl-shockwave-sub">2s Continuous Wave</span>
+                        </button>
+                    </div>
+                </div>
+
+                <button id="btn-continue" class="hidden neon-btn mt-4 px-10 py-3 text-lg rounded mx-auto pointer-events-auto w-full md:w-auto border-fuchsia-500 text-fuchsia-400 hover:bg-fuchsia-500 hover:text-white shadow-[0_0_10px_#f0f,inset_0_0_10px_#f0f] shrink-0">繼續戰鬥</button>
+            </div>
+        </div>
+
+        <!-- 遊戲結束畫面 -->
+        <div id="gameover-screen" class="hidden text-center p-8 bg-gray-900/95 border-2 border-red-500 rounded-xl shadow-[0_0_40px_rgba(255,0,0,0.5)] max-w-lg mx-4 w-full">
+            <h1 class="text-5xl font-black text-red-500 mb-4 drop-shadow-md" id="end-title">SYSTEM FAILURE</h1>
+            <p class="text-xl text-gray-300 mb-4" id="end-desc">你被實體洪流吞噬了...</p>
+            <div class="text-left text-gray-300 mb-8 space-y-3 text-lg bg-black/50 p-6 rounded-lg border border-gray-700">
+                <div class="flex justify-between border-b border-gray-700 pb-2"><span id="lbl-end-time">存活時間</span> <span id="end-time" class="text-white font-mono">00:00</span></div>
+                <div class="flex justify-between border-b border-gray-700 pb-2"><span id="lbl-end-kills">消滅實體</span> <span id="end-kills" class="text-white font-mono text-fuchsia-400">0</span></div>
+                <div class="flex justify-between">
+                    <span class="text-gray-300">
+                        <span id="lbl-end-level-desktop" class="hidden md:inline">系統評級</span>
+                        <span id="lbl-end-level-mobile" class="inline md:hidden">等級</span>
+                    </span>
+                    <span id="end-level" class="text-white font-mono text-cyan-400">1</span>
+                </div>
+            </div>
+            <button id="btn-restart" class="neon-btn px-8 py-4 text-xl font-bold rounded cursor-pointer w-full !border-red-500 !text-red-500 hover:!bg-red-500 hover:!text-black !shadow-[0_0_10px_#f00,inset_0_0_10px_#f00]">REBOOT SYSTEM</button>
+        </div>
+    </div>
+
+<script>
+// ============================================================================
+// 💡 區塊 1：課題設定模組 (TOPIC CONFIGURATION) 
+// ============================================================================
+const TopicConfig = {
+    titleZh: '中二數學第一學期訓練員',
+    titleEn: 'S2 MATH TERM 1 TRAINER',
+    
+    state: {
+        0: { stage: 0, sharedVars: {} }, 
+        1: { stage: 0, sharedVars: {} }, 
+        2: { stage: 0, sharedVars: {} }, 
+        3: { stage: 0, sharedVars: {} }, 
+        4: { stage: 0, sharedVars: {} }, 
+        5: { stage: 0, sharedVars: {} }  
+    },
+
+    randInt: (min, max) => Math.floor(Math.random() * (max - min + 1)) + min,
+    getGCD: function(a, b) { return b === 0 ? a : this.getGCD(b, a % b); },
+
+    generateSVG: function(geoType, vars, isEn) {
+        if (geoType === 0) { 
+            const prefix = vars.isRegular ? (isEn ? 'Reg. ' : '正') : '';
+            return `<svg width="150" height="100" viewBox="0 0 150 100" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <polygon points="45,15 105,15 135,50 105,85 45,85 15,50" fill="none" stroke="#00ffff" stroke-width="2.5" />
+                <path d="M 45,15 L 105,85 M 45,15 L 105,15 L 45,85" stroke="rgba(0,255,255,0.3)" stroke-width="1.5" stroke-dasharray="3,3" />
+                <text x="75" y="55" fill="#e085ff" font-size="12" text-anchor="middle" font-weight="bold">${prefix}${vars.sides} ${isEn ? 'Sides' : '邊形'}</text>
+            </svg>`;
+        } else if (geoType === 1) { 
+            const prefix = vars.isRegular ? (isEn ? 'Reg. ' : '正') : '';
+            return `<svg width="160" height="105" viewBox="0 0 160 105" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <polygon points="50,25 110,25 135,70 30,70" fill="none" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="110" y1="25" x2="155" y2="25" stroke="#ff4500" stroke-width="2" stroke-dasharray="3,3" />
+                <path d="M 120 25 A 15 15 0 0 1 115 38" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="135" y="20" fill="#ffea00" font-size="12" font-weight="bold">θ</text>
+                <text x="75" y="50" fill="#00ffff" font-size="11" text-anchor="middle">${prefix}${vars.sides} ${isEn ? 'Sides' : '邊形'}</text>
+            </svg>`;
+        } else if (geoType === 2) { 
+            return `<svg width="160" height="100" viewBox="0 0 160 100" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <polygon points="25,75 80,25 115,75" fill="none" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="115" y1="75" x2="155" y2="75" stroke="#ff4500" stroke-width="2.5" />
+                <path d="M 127 75 A 12 12 0 0 0 106 62" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="133" y="65" fill="#ffea00" font-size="12" font-weight="bold">x</text>
+                <path d="M 37 75 A 12 12 0 0 0 32 68" fill="none" stroke="#e085ff" stroke-width="1.5" />
+                <text x="42" y="70" fill="#e085ff" font-size="10">${vars.a1}°</text>
+                <path d="M 75 35 A 12 12 0 0 0 87 35" fill="none" stroke="#e085ff" stroke-width="1.5" />
+                <text x="80" y="48" fill="#e085ff" font-size="10">${vars.a2}°</text>
+            </svg>`;
+        } else if (geoType === 3) { 
+            let bPath = "", bText = "";
+            if (vars.subRel === 0) { 
+                bPath = `<path d="M 77 70 A 15 15 0 0 0 73 60" fill="none" stroke="#e085ff" stroke-width="2" />`;
+                bText = `<text x="78" y="62" fill="#e085ff" font-size="11" font-weight="bold">b</text>`;
+            } else if (vars.subRel === 1) { 
+                bPath = `<path d="M 47 70 A 15 15 0 0 0 51 80" fill="none" stroke="#e085ff" stroke-width="2" />`;
+                bText = `<text x="38" y="85" fill="#e085ff" font-size="11" font-weight="bold">b</text>`;
+            } else { 
+                bPath = `<path d="M 47 70 A 15 15 0 0 1 73 60" fill="none" stroke="#e085ff" stroke-width="2" />`;
+                bText = `<text x="55" y="62" fill="#e085ff" font-size="11" font-weight="bold">b</text>`;
+            }
+            return `<svg width="170" height="100" viewBox="0 0 170 100" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <line x1="15" y1="30" x2="155" y2="30" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="15" y1="70" x2="155" y2="70" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="45" y1="85" x2="125" y2="15" stroke="#ffaa00" stroke-width="2" />
+                <text x="20" y="24" fill="#00ffff" font-size="10" font-weight="bold">A</text>
+                <text x="145" y="24" fill="#00ffff" font-size="10" font-weight="bold">B</text>
+                <text x="20" y="88" fill="#00ffff" font-size="10" font-weight="bold">C</text>
+                <text x="145" y="88" fill="#00ffff" font-size="10" font-weight="bold">D</text>
+                <path d="M 93 30 A 15 15 0 0 0 97 40" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="85" y="42" fill="#ffea00" font-size="11" font-weight="bold">a</text>
+                ${bPath}
+                ${bText}
+            </svg>`;
+        } else if (geoType === 4) { 
+            return `<svg width="160" height="100" viewBox="0 0 160 100" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <line x1="20" y1="80" x2="140" y2="80" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="80" y1="80" x2="120" y2="20" stroke="#ff4500" stroke-width="2.5" />
+                <path d="M 105 80 A 25 25 0 0 0 95 58" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="115" y="70" fill="#ffea00" font-size="12">x</text>
+                <path d="M 65 80 A 15 15 0 0 1 90 65" fill="none" stroke="#e085ff" stroke-width="1.5" />
+                <text x="70" y="65" fill="#e085ff" font-size="10">${vars.a}°</text>
+            </svg>`;
+        } else if (geoType === 5) { 
+            return `<svg width="160" height="120" viewBox="0 0 160 120" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <line x1="80" y1="60" x2="80" y2="10" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="80" y1="60" x2="130" y2="90" stroke="#ff4500" stroke-width="2.5" />
+                <line x1="80" y1="60" x2="20" y2="75" stroke="#e085ff" stroke-width="2.5" />
+                <path d="M 80 40 A 20 20 0 0 1 100 70" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="105" y="45" fill="#ffea00" font-size="12">x</text>
+                <path d="M 100 70 A 20 20 0 0 1 60 65" fill="none" stroke="#fff" stroke-width="1" />
+                <text x="80" y="90" fill="#fff" font-size="10" text-anchor="middle">${vars.a}°</text>
+                <path d="M 60 65 A 20 20 0 0 1 80 40" fill="none" stroke="#0ff" stroke-width="1" />
+                <text x="50" y="45" fill="#0ff" font-size="10" text-anchor="middle">${vars.b}°</text>
+            </svg>`;
+        } else if (geoType === 6) { 
+            return `<svg width="160" height="100" viewBox="0 0 160 100" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <line x1="30" y1="20" x2="130" y2="80" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="30" y1="80" x2="130" y2="20" stroke="#ff4500" stroke-width="2.5" />
+                <path d="M 95 40 A 25 25 0 0 1 95 60" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="110" y="55" fill="#ffea00" font-size="12">x</text>
+                <path d="M 65 40 A 25 25 0 0 0 65 60" fill="none" stroke="#e085ff" stroke-width="1.5" />
+                <text x="45" y="55" fill="#e085ff" font-size="10">${vars.a}°</text>
+            </svg>`;
+        } else if (geoType === 7) { 
+            return `<svg width="160" height="100" viewBox="0 0 160 100" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <polygon points="25,75 80,25 135,75" fill="none" stroke="#00ffff" stroke-width="2.5" />
+                <path d="M 72 33 A 15 15 0 0 0 88 33" fill="none" stroke="#ffea00" stroke-width="2" />
+                <text x="80" y="48" fill="#ffea00" font-size="12" text-anchor="middle">x</text>
+                <path d="M 38 75 A 15 15 0 0 0 32 62" fill="none" stroke="#e085ff" stroke-width="1.5" />
+                <text x="40" y="70" fill="#e085ff" font-size="10">${vars.a1}°</text>
+                <path d="M 122 75 A 15 15 0 0 1 128 62" fill="none" stroke="#e085ff" stroke-width="1.5" />
+                <text x="117" y="70" fill="#e085ff" font-size="10">${vars.a2}°</text>
+            </svg>`;
+        } else if (geoType === 8) { 
+            return `<svg width="160" height="120" viewBox="0 0 160 120" class="mx-auto" style="width: 100%; max-width: 220px; height: auto;">
+                <polygon points="80,20 30,90 130,90" fill="none" stroke="#00ffff" stroke-width="2.5" />
+                <line x1="50" y1="50" x2="60" y2="60" stroke="#ffea00" stroke-width="2" />
+                <line x1="110" y1="50" x2="100" y2="60" stroke="#ffea00" stroke-width="2" />
+                <text x="80" y="10" fill="#00ffff" font-size="14" font-weight="bold" text-anchor="middle">B</text>
+                <text x="15" y="95" fill="#00ffff" font-size="14" font-weight="bold">A</text>
+                <text x="140" y="95" fill="#00ffff" font-size="14" font-weight="bold">C</text>
+            </svg>`;
+        }
+    },
+
+    generateQuestion: function(lang) {
+        const isEn = lang === 'en';
+        const rnd = Math.random();
+        let type; 
+        
+        if (rnd < 0.25) type = 2;       
+        else if (rnd < 0.50) type = 3;  
+        else if (rnd < 0.65) type = 1;  
+        else if (rnd < 0.80) type = 5;  
+        else if (rnd < 0.85) type = 0;  
+        else type = 4;                  
+
+        let question = "", correct = "", wrongs = [], svg = null;
+        let state = this.state[type];
+
+        if (type === 0) { 
+            const actionPrefix = isEn ? '\\text{Solve: } ' : '\\text{解方程: } ';
+            if (state.stage === 0) {
+                let a = this.randInt(2, 6); let b = this.randInt(2, 10); let c = this.randInt(5, 25);
+                state.sharedVars = { a, b, c };
+                question = `${actionPrefix}${a}x - ${b} = ${c}`;
+                correct = `${a}x = ${c + b}`;
+                wrongs = [`${a}x = ${c - b}`, `x = ${c} + ${b}`, `${a}x = ${c} \\times ${b}`];
+                state.stage = 1;
+            } else {
+                let { a, b, c } = state.sharedVars;
+                const fromPrefix = isEn ? '\\text{From previous: } ' : '\\text{承上題: } ';
+                question = `${fromPrefix}${a}x = ${c + b}`;
+                correct = `x = \\frac{${c + b}}{${a}}`;
+                wrongs = [`x = ${c + b} - ${a}`, `x = ${a}(${c + b})`, `x = \\frac{${a}}{${c + b}}`];
+                state.stage = 0;
+            }
+
+        } else if (type === 1) { 
+            const actionPrefix = isEn ? '\\text{Simplify: } ' : '\\text{化簡: } ';
+            let subType = state.subType || this.randInt(0, 4);
+            state.subType = subType;
+
+            if (subType === 0) { 
+                if (state.stage === 0) {
+                    let k1 = this.randInt(2, 4); let k2 = this.randInt(2, 4); let m = this.randInt(2, 5);
+                    state.sharedVars = { k1, k2, m };
+                    question = `${actionPrefix}\\frac{${k1*k2}x + ${k1*k2*m}}{${k2}x + ${k2*m}}`;
+                    correct = `\\frac{${k1*k2}(x + ${m})}{${k2}(x + ${m})}`;
+                    wrongs = [`\\frac{${k1*k2}x(1 + ${m})}{${k2}x(1 + ${m})}`, `\\frac{${k1}(x + ${m})}{x + ${m}}`, `\\frac{${k1*k2} + ${m}}{${k2} + ${m}}`];
+                    state.stage = 1;
+                } else {
+                    let { k1, k2, m } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous: } ' : '\\text{承上題: } ';
+                    question = `${fromPrefix}\\frac{${k1*k2}(x + ${m})}{${k2}(x + ${m})}`;
+                    correct = `${k1}`;
+                    wrongs = [`${k1*k2}`, `\\frac{1}{${k1}}`, `x + ${m}`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 1) { 
+                if (state.stage === 0) {
+                    let a = this.randInt(2, 5);
+                    state.sharedVars = { a };
+                    question = `${actionPrefix}\\frac{1}{x + y} - \\frac{${a}}{y - x}`;
+                    correct = `\\frac{1}{x + y} + \\frac{${a}}{x - y}`;
+                    wrongs = [`\\frac{1 - ${a}}{x + y}`, `\\frac{1}{x + y} - \\frac{${a}}{x - y}`, `\\frac{${a} - 1}{x - y}`];
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { a } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous, common denominator: } ' : '\\text{承上題通分母: } ';
+                    question = `${fromPrefix}\\frac{1}{x + y} + \\frac{${a}}{x - y}`;
+                    correct = `\\frac{(x - y) + ${a}(x + y)}{(x + y)(x - y)}`;
+                    wrongs = [`\\frac{x - y + ${a}}{x^2 - y^2}`, `\\frac{1 + ${a}}{x^2 - y^2}`, `\\frac{(x + y) + ${a}(x - y)}{(x + y)(x - y)}`];
+                    state.stage = 2;
+                } else {
+                    let { a } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous, simplify numerator: } ' : '\\text{承上題合併分子: } ';
+                    question = `${fromPrefix}\\frac{(x - y) + ${a}(x + y)}{(x + y)(x - y)}`;
+                    correct = `\\frac{${a+1}x + ${a-1}y}{x^2 - y^2}`;
+                    wrongs = [`\\frac{${a+1}x + ${a+1}y}{x^2 - y^2}`, `\\frac{${a}x + y}{x^2 - y^2}`, `\\frac{${a+1}(x + y)}{x^2 - y^2}`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 2) { 
+                if (state.stage === 0) {
+                    let a = this.randInt(2, 4); let b = this.randInt(5, 9);
+                    state.sharedVars = { a, b };
+                    question = `${actionPrefix}\\frac{${a}}{3x} + \\frac{${b}}{6x}`;
+                    correct = `\\frac{${a*2}}{6x} + \\frac{${b}}{6x}`;
+                    wrongs = [`\\frac{${a} + ${b}}{9x}`, `\\frac{${a*2} + ${b}}{12x}`, `\\frac{${a+b}}{6x}`];
+                    state.stage = 1;
+                } else {
+                    let { a, b } = state.sharedVars;
+                    let num = a * 2 + b;
+                    let gcd = this.getGCD(num, 6);
+                    const fromPrefix = isEn ? '\\text{From previous, add and simplify: } ' : '\\text{承上題相加並約簡: } ';
+                    question = `${fromPrefix}\\frac{${a*2}}{6x} + \\frac{${b}}{6x}`;
+                    correct = gcd > 1 ? `\\frac{${num/gcd}}{${6/gcd}x}` : `\\frac{${num}}{6x}`;
+                    wrongs = [`\\frac{${num}}{9x}`, `\\frac{${num}}{x}`, `\\frac{${a*2 + b}}{12x}`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else if (subType === 3) { 
+                if (state.stage === 0) {
+                    let c1 = 35, c2 = 3, p1 = 2, p2 = 3, p3 = 9, p4 = 5;
+                    state.sharedVars = { c1, c2, p1, p2, p3, p4 };
+                    question = `${actionPrefix}\\frac{${c1}y^{${p1}}}{x^{${p2}}} \\div \\frac{-${c2}x^{${p3}}}{y^{${p4}}}`;
+                    correct = `\\frac{${c1}y^{${p1}}}{x^{${p2}}} \\times \\left(-\\frac{y^{${p4}}}{${c2}x^{${p3}}}\\right)`;
+                    wrongs = [
+                        `\\frac{${c1}y^{${p1}}}{x^{${p2}}} \\times \\frac{-${c2}x^{${p3}}}{y^{${p4}}}`,
+                        `\\frac{x^{${p2}}}{${c1}y^{${p1}}} \\times \\frac{y^{${p4}}}{-${c2}x^{${p3}}}`,
+                        `-\\frac{${c1*c2}y^{${p1}}}{x^{${p2+p3}}y^{${p4}}}`
+                    ];
+                    state.stage = 1;
+                } else {
+                    let { c1, c2, p1, p2, p3, p4 } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous, simplify indices: } ' : '\\text{承上題化簡指數: } ';
+                    question = `${fromPrefix}\\frac{${c1}y^{${p1}}}{x^{${p2}}} \\times \\left(-\\frac{y^{${p4}}}{${c2}x^{${p3}}}\\right)`;
+                    correct = `-\\frac{${c1}y^{${p1+p4}}}{${c2}x^{${p2+p3}}}`;
+                    wrongs = [
+                        `-\\frac{${c1}y^{${p4-p1}}}{${c2}x^{${p3-p2}}}`,
+                        `\\frac{${c1}y^{${p1*p4}}}{${c2}x^{${p2*p3}}}`,
+                        `-\\frac{${c1}x^{${p2+p3}}}{${c2}y^{${p1+p4}}}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            } else { 
+                if (state.stage === 0) {
+                    let a = 3, b = 7, p = 7, k = 3;
+                    state.sharedVars = { a, b, p, k };
+                    question = `${actionPrefix}\\frac{${a}x^{${p}}(x + ${k})}{${b}x} \\div (x + ${k})^2`;
+                    correct = `\\frac{${a}x^{${p}}(x + ${k})}{${b}x} \\times \\frac{1}{(x + ${k})^2}`;
+                    wrongs = [
+                        `\\frac{${a}x^{${p}}(x + ${k})}{${b}x} \\times (x + ${k})^2`,
+                        `\\frac{${b}x}{${a}x^{${p}}(x + ${k})} \\times \\frac{1}{(x + ${k})^2}`,
+                        `\\frac{${a}x^{${p}}}{${b}x(x + ${k})}`
+                    ];
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { a, b, p, k } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous, cancel terms: } ' : '\\text{承上題約簡次數與括號: } ';
+                    question = `${fromPrefix}\\frac{${a}x^{${p}}(x + ${k})}{${b}x} \\times \\frac{1}{(x + ${k})^2}`;
+                    correct = `\\frac{${a}x^{${p-1}}}{${b}(x + ${k})}`;
+                    wrongs = [
+                        `\\frac{${a}x^{${p}}}{${b}(x + ${k})}`,
+                        `\\frac{${a}x^{${p-1}}(x + ${k})}{${b}}`,
+                        `\\frac{${a}x^{${p-1}}}{${b}(x + ${k})^2}`
+                    ];
+                    state.stage = 0; delete state.subType;
+                }
+            }
+
+        } else if (type === 2) { 
+            const actionPrefix = isEn ? '\\text{Expand: } ' : '\\text{展開: } ';
+            let isPerfect = Math.random() < 0.5;
+            if (state.stage === 0) {
+                if (isPerfect) { 
+                    let a = this.randInt(2, 4); let b = this.randInt(2, 5); let sign = Math.random() < 0.5 ? '+' : '-';
+                    state.sharedVars = { a, b, sign, isPerfect: true };
+                    question = `${actionPrefix}(${a}x ${sign} ${b})^2`;
+                    correct = `(${a}x)^2 ${sign} 2(${a}x)(${b}) + (${b})^2`;
+                    wrongs = [`(${a}x)^2 ${sign} (${b})^2`, `${a}x^2 ${sign} ${2*a*b}x + ${b*b}`, `(${a}x)^2 - 2(${a}x)(${b}) - (${b})^2`];
+                    state.stage = 1;
+                } else {
+                    let a = this.randInt(2, 5); let b = this.randInt(2, 5); let c = this.randInt(2, 5); let d = this.randInt(2, 5);
+                    state.sharedVars = { a, b, c, d, isPerfect: false };
+                    question = `${actionPrefix}(${a}x + ${b})(${c}x + ${d})`;
+                    correct = `${a*c}x^2 + ${a*d}x + ${b*c}x + ${b*d}`;
+                    wrongs = [`${a*c}x^2 + ${b*d}`, `${a*c}x^2 + ${a*d*b*c}x + ${b*d}`, `${a+c}x^2 + ${b+d}x`];
+                    state.stage = 1;
+                }
+            } else {
+                if (state.sharedVars.isPerfect) {
+                    let { a, b, sign } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous: } ' : '\\text{承上題: } ';
+                    question = `${fromPrefix}(${a}x)^2 ${sign} 2(${a}x)(${b}) + (${b})^2`;
+                    correct = `${a*a}x^2 ${sign} ${2*a*b}x + ${b*b}`;
+                    wrongs = [`${a*a}x^2 ${sign} ${b*b}`, `${a*a}x^2 ${sign} ${a*b}x + ${b*b}`, `${a*a}x^2 ${sign} ${2*a*b}x - ${b*b}`];
+                    state.stage = 0;
+                } else {
+                    let { a, b, c, d } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous: } ' : '\\text{承上題: } ';
+                    question = `${fromPrefix}${a*c}x^2 + ${a*d}x + ${b*c}x + ${b*d}`;
+                    correct = `${a*c}x^2 + ${a*d + b*c}x + ${b*d}`;
+                    wrongs = [`${a*c}x^2 + ${a*d*b*c}x + ${b*d}`, `${a*c}x^2 + ${b*d}`, `${a*c + a*d + b*c}x^2 + ${b*d}`];
+                    state.stage = 0;
+                }
+            }
+
+        } else if (type === 3) { 
+            const actionPrefix = isEn ? '\\text{Factorize: } ' : '\\text{因式分解: } ';
+            let subType = state.subType || (Math.random() < 0.5 ? 'diff_sq' : 'perf_sq');
+            state.subType = subType;
+
+            if (subType === 'diff_sq') { 
+                if (state.stage === 0) {
+                    let a, b, k;
+                    do { a = this.randInt(2, 5); b = this.randInt(2, 5); } while (this.getGCD(a, b) !== 1);
+                    k = this.randInt(2, 4);
+                    state.sharedVars = { a, b, k };
+                    question = `${actionPrefix}${k*a*a}x^2 - ${k*b*b}y^2`;
+                    correct = `${k}(${a*a}x^2 - ${b*b}y^2)`;
+                    wrongs = [`${k}(${a}x - ${b}y)^2`, `(${k*a}x - ${k*b}y)(${k*a}x + ${k*b}y)`, `${k*a}x^2 - ${k*b}y^2`];
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { a, b, k } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous, format as } A^2 - B^2: ' : '\\text{承上題表示為 } A^2 - B^2 \\text{ 形式: } ';
+                    question = `${fromPrefix}${k}(${a*a}x^2 - ${b*b}y^2)`;
+                    correct = `${k}[(${a}x)^2 - (${b}y)^2]`;
+                    wrongs = [`${k}[(${a*a}x)^2 - (${b*b}y)^2]`, `${k}(${a}x^2 - ${b}y^2)`, `[(${a}x)^2 + (${b}y)^2]`];
+                    state.stage = 2;
+                } else {
+                    let { a, b, k } = state.sharedVars;
+                    const fromPrefix = isEn ? '\\text{From previous, factorize completely: } ' : '\\text{承上題完成因式分解: } ';
+                    question = `${fromPrefix}${k}[(${a}x)^2 - (${b}y)^2]`;
+                    correct = `${k}(${a}x - ${b}y)(${a}x + ${b}y)`;
+                    wrongs = [`${k}(${a}x - ${b}y)^2`, `${k}(${a}x + ${b}y)^2`, `(${a}x - ${b}y)(${a}x + ${b}y)`];
+                    state.stage = 0; delete state.subType;
+                }
+            } else { 
+                if (state.stage === 0) {
+                    let a, b, k, sign;
+                    do { a = this.randInt(1, 4); b = this.randInt(1, 4); } while (this.getGCD(a, b) !== 1);
+                    k = this.randInt(2, 4); sign = Math.random() < 0.5 ? '+' : '-';
+                    let midSign = sign === '+' ? '+' : '-';
+                    state.sharedVars = { a, b, k, sign };
+                    question = `${actionPrefix}${k*a*a}x^2 ${midSign} ${2*k*a*b}xy + ${k*b*b}y^2`;
+                    correct = `${k}(${a*a}x^2 ${midSign} ${2*a*b}xy + ${b*b}y^2)`;
+                    wrongs = [
+                        `${k}(${a}x ${midSign} ${b}y)^2`,
+                        `(${k*a}x ${midSign} ${k*b}y)^2`,
+                        `${k}(${a*a}x^2 ${midSign} ${a*b}xy + ${b*b}y^2)`
+                    ];
+                    state.stage = 1;
+                } else if (state.stage === 1) {
+                    let { a, b, k, sign } = state.sharedVars;
+                    let midSign = sign === '+' ? '+' : '-';
+                    const fromPrefix = isEn ? '\\text{From previous, format as } A^2 \\pm 2AB + B^2: ' : '\\text{承上題表示為 } A^2 \\pm 2AB + B^2 \\text{ 形式: } ';
+                    question = `${fromPrefix}${k}(${a*a}x^2 ${midSign} ${2*a*b}xy + ${b*b}y^2)`;
+                    correct = `${k}[(${a}x)^2 ${midSign} 2(${a}x)(${b}y) + (${b}y)^2]`;
+                    wrongs = [
+                        `${k}[(${a}x)^2 ${midSign} (${b}y)^2]`,
+                        `${k}[(${a*a}x)^2 ${midSign} 2(${a}x)(${b}y) + (${b*b}y)^2]`,
+                        `[(${a}x)^2 ${midSign} 2(${a}x)(${b}y) + (${b}y)^2]`
+                    ];
+                    state.stage = 2;
+                } else {
+                    let { a, b, k, sign } = state.sharedVars;
+                    let midSign = sign === '+' ? '+' : '-';
+                    const fromPrefix = isEn ? '\\text{From previous, factorize completely: } ' : '\\text{承上題完成完全平方因式分解: } ';
+                    question = `${fromPrefix}${k}[(${a}x)^2 ${midSign} 2(${a}x)(${b}y) + (${b}y)^2]`;
+                    correct = `${k}(${a}x ${midSign} ${b}y)^2`;
+                    wrongs = [`${k}(${a}x - ${b}y)(${a}x + ${b}y)`, `(${a}x ${midSign} ${b}y)^2`, `${k}(${a}x ${midSign} ${b}y)`];
+                    state.stage = 0; delete state.subType;
+                }
+            }
+
+        } else if (type === 5) { 
+            const actionPrefix = isEn ? '\\text{Make } x \\text{ the subject: } ' : '\\text{主項變換 } x: ';
+            if (state.stage === 0) {
+                let sub = this.randInt(0, 5);
+                let a = this.randInt(4, 7); let b = this.randInt(2, 5); let c = this.randInt(2, 3); let d = this.randInt(2, 5); let e = this.randInt(2, 5);
+                state.sharedVars = { sub, a, b, c, d, e };
+                
+                if (sub === 0) {
+                    question = `${actionPrefix}${a}x + ${b}y = ${c}`;
+                    correct = `${a}x = ${c} - ${b}y`;
+                    wrongs = [`${a}x = ${c} + ${b}y`, `${a}x = ${b}y - ${c}`, `x = ${c} - ${b}y - ${a}`];
+                    state.stage = 1;
+                } else if (sub === 1) {
+                    question = `${actionPrefix}${a}x + ${b}y = ${c}x + ${d}`;
+                    correct = `${a}x - ${c}x = ${d} - ${b}y`;
+                    wrongs = [`${a}x + ${c}x = ${d} + ${b}y`, `${a}x - ${c}x = ${b}y - ${d}`, `x(${a} + ${c}) = ${d} - ${b}y`];
+                    state.stage = 1;
+                } else if (sub === 2) {
+                    question = `${actionPrefix}\\frac{x}{${a}} + \\frac{y}{${b}} = ${c}`;
+                    correct = `\\frac{x}{${a}} = ${c} - \\frac{y}{${b}}`;
+                    wrongs = [`\\frac{x}{${a}} = \\frac{y}{${b}} - ${c}`, `x = ${c} - \\frac{y}{${b}} - ${a}`, `\\frac{x}{${a}} = ${c} + \\frac{y}{${b}}`];
+                    state.stage = 1;
+                } else if (sub === 3) {
+                    question = `${actionPrefix}y = \\frac{${a}x + ${b}}{${c}x + ${d}}`;
+                    correct = `y(${c}x + ${d}) = ${a}x + ${b}`;
+                    wrongs = [`y(${a}x + ${b}) = ${c}x + ${d}`, `${c}xy + ${d} = ${a}x + ${b}`, `y + ${c}x + ${d} = ${a}x + ${b}`];
+                    state.stage = 1;
+                } else if (sub === 4) {
+                    do { a = this.randInt(2, 6); c = this.randInt(2, 4); d = this.randInt(2, 3); } while (a === c * d || Math.abs(a - c * d) === 1);
+                    b = this.randInt(2, 5); e = this.randInt(2, 5);
+                    state.sharedVars = { sub, a, b, c, d, e };
+                    question = `${actionPrefix}${a}(x - ${b}y) - ${c}(${d}x - y) = ${e}`;
+                    correct = `${a}x - ${a*b}y - ${c*d}x + ${c}y = ${e}`;
+                    wrongs = [
+                        `${a}x - ${b}y - ${c*d}x - ${c}y = ${e}`,
+                        `${a}x - ${a*b}y - ${c*d}x - ${c}y = ${e}`,
+                        `${a}x - ${b}y - ${c*d}x + y = ${e}`
+                    ];
+                    state.stage = 1;
+                } else if (sub === 5) {
+                    do { b = this.randInt(2, 4); e = this.randInt(2, 4); d = this.randInt(2, 3); } while (e === b * d || Math.abs(e - b * d) === 1 || b === e);
+                    a = this.randInt(2, 5); c = this.randInt(2, 5);
+                    state.sharedVars = { sub, a, b, c, d, e };
+                    question = `${actionPrefix}\\frac{x + ${a}y}{${b}} = ${c} + \\frac{${d}x - y}{${e}}`;
+                    correct = `${e}(x + ${a}y) = ${b*e*c} + ${b}(${d}x - y)`;
+                    wrongs = [
+                        `${e}x + ${a}y = ${c} + ${b*d}x - ${b}y`,
+                        `${e}(x + ${a}y) = ${c} + ${b}(${d}x - y)`,
+                        `x + ${a}y = ${b*c} + ${d}x - y`
+                    ];
+                    state.stage = 1;
+                }
+            } else {
+                let { sub, a, b, c, d, e } = state.sharedVars;
+                const fromPrefix = isEn ? '\\text{From previous: } ' : '\\text{承上題: } ';
+                
+                if (sub === 0) { 
+                    question = `${fromPrefix}${a}x = ${c} - ${b}y`;
+                    correct = `x = \\frac{${c} - ${b}y}{${a}}`;
+                    wrongs = [`x = \\frac{${c} + ${b}y}{${a}}`, `x = \\frac{${a}}{${c} - ${b}y}`, `x = ${c} - ${b}y - ${a}`];
+                    state.stage = 0;
+                } else if (sub === 1) { 
+                    if (state.stage === 1) { 
+                        question = `${fromPrefix}${a}x - ${c}x = ${d} - ${b}y`;
+                        correct = `${a-c}x = ${d} - ${b}y`;
+                        wrongs = [`${a+c}x = ${d} - ${b}y`, `${a-c}x = ${b}y - ${d}`, `x = \\frac{${d} - ${b}y}{${a} - ${c}}`];
+                        state.stage = 2;
+                    } else if (state.stage === 2) { 
+                        question = `${fromPrefix}${a-c}x = ${d} - ${b}y`;
+                        correct = `x = \\frac{${d} - ${b}y}{${a - c}}`;
+                        wrongs = [`x = \\frac{${d} + ${b}y}{${a - c}}`, `x = \\frac{${a - c}}{${d} - ${b}y}`, `x = ${d} - ${b}y - ${a - c}`];
+                        state.stage = 0;
+                    }
+                } else if (sub === 2) { 
+                    if (state.stage === 1) { 
+                        question = `${fromPrefix}\\frac{x}{${a}} = ${c} - \\frac{y}{${b}}`;
+                        correct = `\\frac{x}{${a}} = \\frac{${b*c} - y}{${b}}`;
+                        wrongs = [`\\frac{x}{${a}} = \\frac{${c} - y}{${b}}`, `\\frac{x}{${a}} = \\frac{y - ${b*c}}{${b}}`, `\\frac{x}{${a}} = \\frac{${b*c} + y}{${b}}`];
+                        state.stage = 2;
+                    } else if (state.stage === 2) { 
+                        question = `${fromPrefix}\\frac{x}{${a}} = \\frac{${b*c} - y}{${b}}`;
+                        correct = `x = \\frac{${a}(${b*c} - y)}{${b}}`;
+                        wrongs = [`x = \\frac{${b*c} - y}{${a*b}}`, `x = \\frac{${b}(${b*c} - y)}{${a}}`, `x = \\frac{${a} - y}{${b}}`];
+                        state.stage = 0;
+                    }
+                } else if (sub === 3) { 
+                    if (state.stage === 1) { 
+                        question = `${fromPrefix}y(${c}x + ${d}) = ${a}x + ${b}`;
+                        correct = `${c}xy + ${d}y = ${a}x + ${b}`;
+                        wrongs = [`${c}xy + ${d} = ${a}x + ${b}`, `y${c}x + d = ${a}x + ${b}`, `${c}xy + ${d}y = x(${a} + ${b})`];
+                        state.stage = 2;
+                    } else if (state.stage === 2) { 
+                        question = `${fromPrefix}${c}xy + ${d}y = ${a}x + ${b}`;
+                        correct = `${c}xy - ${a}x = ${b} - ${d}y`;
+                        wrongs = [`${c}xy + ${a}x = ${b} + ${d}y`, `${a}x - ${c}xy = ${b} - ${d}y`, `x(${c}y - ${a}) = ${b} - ${d}y`];
+                        state.stage = 3;
+                    } else if (state.stage === 3) { 
+                        question = `${fromPrefix}${c}xy - ${a}x = ${b} - ${d}y`;
+                        correct = `x(${c}y - ${a}) = ${b} - ${d}y`;
+                        wrongs = [`x(${c}y + ${a}) = ${b} - ${d}y`, `x(${a} - ${c}y) = ${b} - ${d}y`, `x = \\frac{${b} - ${d}y}{${c}y - ${a}}`];
+                        state.stage = 4;
+                    } else if (state.stage === 4) { 
+                        question = `${fromPrefix}x(${c}y - ${a}) = ${b} - ${d}y`;
+                        correct = `x = \\frac{${b} - ${d}y}{${c}y - ${a}}`;
+                        wrongs = [`x = \\frac{${b} + ${d}y}{${c}y - ${a}}`, `x = \\frac{${c}y - ${a}}{${b} - ${d}y}`, `x = \\frac{${d}y - ${b}}{${c}y - ${a}}`];
+                        state.stage = 0;
+                    }
+                } else if (sub === 4) {
+                    if (state.stage === 1) {
+                        question = `${fromPrefix}${a}x - ${a*b}y - ${c*d}x + ${c}y = ${e}`;
+                        let coeffX = a - c*d; let coeffY = a*b - c;
+                        let yTerm = coeffY > 0 ? `+ ${coeffY}y` : (coeffY < 0 ? `- ${Math.abs(coeffY)}y` : '');
+                        correct = `${coeffX}x = ${e} ${yTerm}`;
+                        wrongs = [`${a+c*d}x = ${e} ${yTerm}`, `${coeffX}x = ${e} ${coeffY > 0 ? `- ${coeffY}y` : `+ ${Math.abs(coeffY)}y`}`, `${coeffX}x = ${e} + ${a*b+c}y`];
+                        state.stage = 2;
+                    } else if (state.stage === 2) {
+                        let coeffX = a - c*d; let coeffY = a*b - c;
+                        let yTerm = coeffY > 0 ? `+ ${coeffY}y` : (coeffY < 0 ? `- ${Math.abs(coeffY)}y` : '');
+                        question = `${fromPrefix}${coeffX}x = ${e} ${yTerm}`;
+                        correct = `x = \\frac{${e} ${yTerm}}{${coeffX}}`;
+                        wrongs = [`x = \\frac{${e} ${coeffY > 0 ? `- ${coeffY}y` : `+ ${Math.abs(coeffY)}y`}}{${coeffX}}`, `x = \\frac{${coeffX}}{${e} ${yTerm}}`, `x = ${e} ${yTerm} - ${coeffX}`];
+                        state.stage = 0;
+                    }
+                } else if (sub === 5) {
+                    if (state.stage === 1) {
+                        question = `${fromPrefix}${e}(x + ${a}y) = ${b*e*c} + ${b}(${d}x - y)`;
+                        correct = `${e}x + ${e*a}y = ${b*e*c} + ${b*d}x - ${b}y`;
+                        wrongs = [`${e}x + ${a}y = ${b*e*c} + ${b*d}x - y`, `${e}x + ${e*a}y = ${b*e*c} + ${b*d}x + ${b}y`, `${e}x - ${e*a}y = ${b*e*c} - ${b*d}x - ${b}y`];
+                        state.stage = 2;
+                    } else if (state.stage === 2) {
+                        question = `${fromPrefix}${e}x + ${e*a}y = ${b*e*c} + ${b*d}x - ${b}y`;
+                        let coeffX = e - b*d; let coeffY = -b - e*a;
+                        let yTerm = coeffY > 0 ? `+ ${coeffY}y` : (coeffY < 0 ? `- ${Math.abs(coeffY)}y` : '');
+                        correct = `${coeffX}x = ${b*e*c} ${yTerm}`;
+                        wrongs = [`${e+b*d}x = ${b*e*c} ${yTerm}`, `${coeffX}x = ${b*e*c} ${coeffY > 0 ? `- ${coeffY}y` : `+ ${Math.abs(coeffY)}y`}`, `${coeffX}x = ${b*e*c} + ${e*a - b}y`];
+                        state.stage = 3;
+                    } else if (state.stage === 3) {
+                        let coeffX = e - b*d; let coeffY = -b - e*a;
+                        let yTerm = coeffY > 0 ? `+ ${coeffY}y` : (coeffY < 0 ? `- ${Math.abs(coeffY)}y` : '');
+                        question = `${fromPrefix}${coeffX}x = ${b*e*c} ${yTerm}`;
+                        correct = `x = \\frac{${b*e*c} ${yTerm}}{${coeffX}}`;
+                        wrongs = [`x = \\frac{${b*e*c} ${coeffY > 0 ? `- ${coeffY}y` : `+ ${Math.abs(coeffY)}y`}}{${coeffX}}`, `x = \\frac{${coeffX}}{${b*e*c} ${yTerm}}`, `x = \\frac{${b*e*c} ${yTerm}}{${e+b*d}}`];
+                        state.stage = 0;
+                    }
+                }
+            }
+
+        } else { 
+            let geoType = this.randInt(0, 4);
+            const actionPrefix = isEn ? '\\text{Find } x: ' : '\\text{求解 } x: ';
+
+            if (state.stage === 0) {
+                if (geoType === 0) { 
+                    let niceSides = [5, 6, 8, 9, 10, 12];
+                    let sides = niceSides[this.randInt(0, niceSides.length - 1)];
+                    let subType = this.randInt(0, 3);
+                    
+                    if (subType === 0) {
+                        question = isEn ? `\\text{Int. } \\angle \\text{ sum of } ${sides}\\text{-gon}` : `\\text{求 } ${sides} \\text{ 邊形內角和}`;
+                        correct = `(${sides} - 2) \\times 180^\\circ \\quad (${isEn ? '\\angle \\text{ sum of polygon}' : '\\text{多邊形內角和}'})`;
+                        wrongs = [`${sides} \\times 180^\\circ`, `(${sides} - 1) \\times 180^\\circ`, `360^\\circ`];
+                        svg = this.generateSVG(0, { sides, isRegular: false }, isEn);
+                    } else if (subType === 1) {
+                        let ans = (sides - 2) * 180 / sides;
+                        question = isEn ? `\\text{Each int. } \\angle \\text{ of regular } ${sides}\\text{-gon}` : `\\text{正 } ${sides} \\text{ 邊形的每個內角}`;
+                        correct = `${ans}^\\circ`;
+                        wrongs = [`${360 / sides}^\\circ`, `${ans + 12}^\\circ`, `${ans - 10}^\\circ`];
+                        svg = this.generateSVG(0, { sides, isRegular: true }, isEn);
+                    } else if (subType === 2) {
+                        question = isEn ? `\\text{Ext. } \\angle \\text{ sum of } ${sides}\\text{-gon}` : `\\text{求 } ${sides} \\text{ 邊形外角和}`;
+                        correct = `360^\\circ \\quad (${isEn ? '\\text{sum of ext. } \\angle s \\text{ of polygon}' : '\\text{多邊形外角和}'})`;
+                        wrongs = [`(${sides} - 2) \\times 180^\\circ`, `${sides} \\times 180^\\circ`, `180^\\circ`];
+                        svg = this.generateSVG(1, { sides, isRegular: false }, isEn);
+                    } else {
+                        let ans = 360 / sides;
+                        question = isEn ? `\\text{Each ext. } \\angle \\text{ of regular } ${sides}\\text{-gon}` : `\\text{正 } ${sides} \\text{ 邊形的每個外角}`;
+                        correct = `${ans}^\\circ`;
+                        wrongs = [`${ans * 2}^\\circ`, `${(sides - 2) * 180 / sides}^\\circ`, `${ans + 10}^\\circ`];
+                        svg = this.generateSVG(1, { sides, isRegular: true }, isEn);
+                    }
+
+                } else if (geoType === 1) { 
+                    let niceSides = [5, 6, 8, 9, 10, 12, 15];
+                    let sides = niceSides[this.randInt(0, niceSides.length - 1)];
+                    let isInt = Math.random() < 0.5;
+                    
+                    if (isInt) {
+                        let sum = (sides - 2) * 180;
+                        question = isEn ? `\\text{Int. } \\angle \\text{ sum is } ${sum}^\\circ\\text{. Find sides } n:` : `\\text{內角和為 } ${sum}^\\circ\\text{。求邊數 } n:`;
+                        correct = `n = ${sides}`;
+                        wrongs = [`n = ${sides - 2}`, `n = ${sides + 2}`, `n = ${sides + 1}`];
+                    } else {
+                        let extEach = 360 / sides;
+                        question = isEn ? `\\text{Each ext. } \\angle \\text{ is } ${extEach}^\\circ\\text{. Find sides } n:` : `\\text{每個外角為 } ${extEach}^\\circ\\text{。求邊數 } n:`;
+                        correct = `n = ${sides}`;
+                        wrongs = [`n = ${sides - 2}`, `n = ${Math.floor(360/extEach) + 2}`, `n = ${sides * 2}`];
+                    }
+                    svg = this.generateSVG(0, { sides: 'n', isRegular: !isInt }, isEn);
+
+                } else if (geoType === 2) { 
+                    let subType = this.randInt(0, 2);
+                    let a1 = this.randInt(40, 70); let a2 = this.randInt(30, 60);
+                    
+                    if (subType === 0) {
+                        question = `${actionPrefix} x`;
+                        correct = `x + ${a1}^\\circ + ${a2}^\\circ = 180^\\circ \\quad (${isEn ? '\\angle \\text{ sum of } \\triangle' : '\\text{三角形內角和}'})`;
+                        wrongs = [
+                            `x = 180^\\circ - ${a1}^\\circ - ${a2}^\\circ`,
+                            `x + ${a1}^\\circ = ${a2}^\\circ`,
+                            `x = ${a1}^\\circ + ${a2}^\\circ`
+                        ];
+                        svg = this.generateSVG(7, { a1, a2 }, isEn);
+                    } else if (subType === 1) {
+                        question = `${actionPrefix} x`;
+                        correct = `x = ${a1}^\\circ + ${a2}^\\circ \\quad (${isEn ? '\\text{ext. } \\angle \\text{ of } \\triangle' : '\\text{三角形外角}'})`;
+                        wrongs = [
+                            `x + ${a1}^\\circ + ${a2}^\\circ = 180^\\circ`,
+                            `x = 180^\\circ - (${a1}^\\circ + ${a2}^\\circ)`,
+                            `x = 360^\\circ - ${a1}^\\circ`
+                        ];
+                        svg = this.generateSVG(2, { a1, a2 }, isEn);
+                    } else { 
+                        question = isEn ? `\\text{Given } AB = BC, \\text{ choose correct:}` : `\\text{已知 } AB = BC\\text{，選出正確推論:}`;
+                        correct = `\\because AB = BC, \\therefore \\angle A = \\angle C \\quad (${isEn ? '\\text{base } \\angle s, \\text{ isos. } \\triangle' : '\\text{等腰三角形底角}'})`;
+                        wrongs = [
+                            `\\because AB = BC, \\therefore \\angle A = \\angle C \\quad (${isEn ? '\\angle \\text{ sum of } \\triangle' : '\\text{三角形內角和}'})`,
+                            `\\because AB = BC, \\therefore \\angle A = \\angle B \\quad (${isEn ? '\\text{base } \\angle s, \\text{ isos. } \\triangle' : '\\text{等腰三角形底角}'})`,
+                            `\\because AB = BC, \\therefore \\angle A + \\angle C = 180^\\circ \\quad (${isEn ? '\\text{adj. } \\angle s \\text{ on st. line}' : '\\text{直線上的鄰角}'})`
+                        ];
+                        svg = this.generateSVG(8, {}, isEn);
+                    }
+
+                } else if (geoType === 3) { 
+                    let subRel = this.randInt(0, 2);
+                    question = `${actionPrefix} x`;
+                    
+                    if (subRel === 0) { 
+                        let a = this.randInt(40, 140);
+                        state.sharedVars = { geoType: 3, subRel: 0, a };
+                        question = `${actionPrefix} x`;
+                        correct = `x + ${a}^\\circ = 180^\\circ \\quad (${isEn ? '\\text{adj. } \\angle s \\text{ on st. line}' : '\\text{直線上的鄰角}'})`;
+                        wrongs = [
+                            `x = 180^\\circ - ${a}^\\circ`,
+                            `x = ${a}^\\circ \\quad (${isEn ? '\\text{vert. opp. } \\angle s' : '\\text{對頂角}'})`,
+                            `x + ${a}^\\circ = 360^\\circ`
+                        ];
+                        svg = this.generateSVG(4, {a}, isEn);
+                        state.stage = 1;
+                    } else if (subRel === 1) { 
+                        let a = this.randInt(80, 120); let b = this.randInt(80, 120);
+                        state.sharedVars = { geoType: 3, subRel: 1, a, b };
+                        question = `${actionPrefix} x`;
+                        correct = `x + ${a}^\\circ + ${b}^\\circ = 360^\\circ \\quad (${isEn ? '\\angle s \\text{ at a pt.}' : '\\text{同頂角}'})`;
+                        wrongs = [
+                            `x + ${a}^\\circ + ${b}^\\circ = 180^\\circ \\quad (${isEn ? '\\text{adj. } \\angle s \\text{ on st. line}' : '\\text{直線上的鄰角}'})`,
+                            `x = 360^\\circ - ${a}^\\circ - ${b}^\\circ`,
+                            `x = ${a}^\\circ + ${b}^\\circ`
+                        ];
+                        svg = this.generateSVG(5, {a, b}, isEn);
+                        state.stage = 1;
+                    } else { 
+                        let a = this.randInt(40, 140);
+                        correct = `x = ${a}^\\circ \\quad (${isEn ? '\\text{vert. opp. } \\angle s' : '\\text{對頂角}'})`;
+                        wrongs = [
+                            `x + ${a}^\\circ = 180^\\circ \\quad (${isEn ? '\\text{adj. } \\angle s \\text{ on st. line}' : '\\text{直線上的鄰角}'})`,
+                            `x = 360^\\circ - ${a}^\\circ`,
+                            `x = 90^\\circ - ${a}^\\circ`
+                        ];
+                        svg = this.generateSVG(6, {a}, isEn);
+                        state.stage = 0;
+                    }
+
+                } else { 
+                    let subRel = this.randInt(0, 2);
+                    question = isEn ? `\\text{If } AB // CD, \\text{ find relation:}` : `\\text{若 } AB // CD \\text{，求角度關係:}`;
+                    
+                    if (subRel === 0) { 
+                        correct = `a = b \\quad (${isEn ? '\\text{alt. } \\angle s, AB // CD' : '\\text{內錯角}, AB//CD'})`;
+                        wrongs = [
+                            `a + b = 180^\\circ \\quad (${isEn ? '\\text{int. } \\angle s, AB // CD' : '\\text{同旁內角}, AB//CD'})`, 
+                            `a = b \\quad (${isEn ? '\\text{corr. } \\angle s, AB // CD' : '\\text{同位角}, AB//CD'})`, 
+                            `a + b = 180^\\circ \\quad (${isEn ? '\\text{adj. } \\angle s \\text{ on st. line}' : '\\text{直線上的鄰角}'})`
+                        ];
+                    } else if (subRel === 1) { 
+                        correct = `a = b \\quad (${isEn ? '\\text{corr. } \\angle s, AB // CD' : '\\text{同位角}, AB//CD'})`;
+                        wrongs = [
+                            `a + b = 180^\\circ \\quad (${isEn ? '\\text{int. } \\angle s, AB // CD' : '\\text{同旁內角}, AB//CD'})`, 
+                            `a = b \\quad (${isEn ? '\\text{alt. } \\angle s, AB // CD' : '\\text{內錯角}, AB//CD'})`, 
+                            `a + b = 180^\\circ \\quad (${isEn ? '\\text{adj. } \\angle s \\text{ on st. line}' : '\\text{直線上的鄰角}'})`
+                        ];
+                    } else { 
+                        correct = `a + b = 180^\\circ \\quad (${isEn ? '\\text{int. } \\angle s, AB // CD' : '\\text{同旁內角}, AB//CD'})`;
+                        wrongs = [
+                            `a = b \\quad (${isEn ? '\\text{alt. } \\angle s, AB // CD' : '\\text{內錯角}, AB//CD'})`, 
+                            `a = b \\quad (${isEn ? '\\text{corr. } \\angle s, AB // CD' : '\\text{同位角}, AB//CD'})`, 
+                            `a + b = 360^\\circ \\quad (${isEn ? '\\angle s \\text{ at a pt.}' : '\\text{同頂角}'})`
+                        ];
+                    }
+                    svg = this.generateSVG(3, { subRel }, isEn);
+                }
+            } else { 
+                let { subRel, a, b } = state.sharedVars;
+                const fromPrefix = isEn ? '\\text{From previous: } ' : '\\text{承上題: } ';
+                if (subRel === 0) {
+                    question = `${fromPrefix}x + ${a}^\\circ = 180^\\circ`;
+                    correct = `x = 180^\\circ - ${a}^\\circ = ${180 - a}^\\circ`;
+                    wrongs = [`x = 180^\\circ + ${a}^\\circ = ${180 + a}^\\circ`, `x = ${a}^\\circ`, `x = 360^\\circ - ${a}^\\circ`];
+                    svg = this.generateSVG(4, {a}, isEn);
+                } else if (subRel === 1) {
+                    question = `${fromPrefix}x + ${a}^\\circ + ${b}^\\circ = 360^\\circ`;
+                    correct = `x = 360^\\circ - ${a}^\\circ - ${b}^\\circ = ${360 - a - b}^\\circ`;
+                    wrongs = [`x = 180^\\circ - ${a}^\\circ - ${b}^\\circ`, `x = 360^\\circ - (${a}^\\circ - ${b}^\\circ)`, `x = ${a + b}^\\circ`];
+                    svg = this.generateSVG(5, {a, b}, isEn);
+                }
+                state.stage = 0;
+            }
+        }
+
+        if(!correct) { correct = "0"; wrongs = ["1","2","3"]; question="\\text{Error}"; }
+
+        let options = wrongs.slice(0, 3);
+        const correctIdx = Math.floor(Math.random() * 4);
+        options.splice(correctIdx, 0, correct);
+
+        return { question, options, correctIdx, svg };
+    }
+};
+
+// ============================================================================
+// ⚙️ 區塊 2：核心技能與遊戲引擎 (CORE SKILLS & GAME ENGINE)
+// ============================================================================
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const modalContainer = document.getElementById('modal-container');
+const startScreen = document.getElementById('start-screen');
+const levelupScreen = document.getElementById('levelup-screen');
+const gameoverScreen = document.getElementById('gameover-screen');
+
+const btnStartZh = document.getElementById('btn-start-zh');
+const btnStartEn = document.getElementById('btn-start-en');
+const btnRestart = document.getElementById('btn-restart');
+const btnContinue = document.getElementById('btn-continue');
+
+const uiLevel = document.getElementById('ui-level');
+const uiTimer = document.getElementById('ui-timer');
+const uiHp = document.getElementById('ui-hp');
+const uiMaxHp = document.getElementById('ui-maxhp');
+const uiKills = document.getElementById('ui-kills');
+const expBar = document.getElementById('exp-bar');
+const quizTimerBar = document.getElementById('quiz-timer-bar');
+const quizTimerText = document.getElementById('quiz-timer-text');
+const quizTimerContainer = document.getElementById('quiz-timer-container');
+
+const GAME_DURATION = 10 * 60 * 1000;
+const QUIZ_INTERVAL = 5000;
+const WORLD_SIZE = { width: 4000, height: 4000 };
+
+let gameState = 'START'; 
+let currentLang = 'zh';
+let lastTime = 0, gameTime = 0, timeSinceLastQuiz = 0, activeShockwaveBurstTimer = 0;
+let animationFrameId, quizTimerInterval;
+let camera = { x: 0, y: 0 };
+let joystickVector = { x: 0, y: 0 };
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+let player, enemies = [], particles = [], projectiles = [], floatingTexts = [], kills = 0;
+let currentQuizzesData = [], currentUpgrades = [], quizResults = [null, null, null], activeQuizzes = 3, quizTimeLeft = 30;
+
+const weaponDetails = {
+    meteor: { name: '流星錘', color: '#00ffff', icon: '☄️', uiId: 'progress-meteor' },
+    lightning: { name: '連環閃電', color: '#b500ff', icon: '⚡', uiId: 'progress-lightning' },
+    firestorm: { name: '火燒連環', color: '#ff4500', icon: '🔥', uiId: 'progress-firestorm' },
+    shockwave: { name: '衝擊波', color: '#ffee00', icon: '💥', uiId: 'progress-shockwave' }
+};
+
+document.getElementById('main-title-text').innerText = TopicConfig.titleZh;
+document.getElementById('sub-title-text').innerText = TopicConfig.titleEn;
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+window.addEventListener('keydown', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = true; });
+window.addEventListener('keyup', (e) => { if(keys.hasOwnProperty(e.key)) keys[e.key] = false; });
+
+// === 全螢幕動態浮動搖桿邏輯 ===
+let isDraggingJoystick = false, joyCenter = { x: 0, y: 0 }; const maxJoyDist = 40;
+const joyUi = document.getElementById('joystick-ui');
+const joyBase = document.getElementById('joystick-base');
+const joyStick = document.getElementById('joystick-stick');
+
+canvas.addEventListener('touchstart', (e) => {
+    if (gameState !== 'PLAYING') return;
+    e.preventDefault();
+    isDraggingJoystick = true;
+    const touch = e.touches[0];
+    joyCenter = { x: touch.clientX, y: touch.clientY };
+    
+    joyUi.style.display = 'block';
+    joyBase.style.left = touch.clientX + 'px';
+    joyBase.style.top = touch.clientY + 'px';
+    joyStick.style.left = touch.clientX + 'px';
+    joyStick.style.top = touch.clientY + 'px';
+    joyStick.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+    
+    updateJoystick(touch.clientX, touch.clientY);
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+    if (gameState === 'PLAYING' && isDraggingJoystick) {
+        e.preventDefault();
+        updateJoystick(e.touches[0].clientX, e.touches[0].clientY);
+    }
+}, { passive: false });
+
+const resetJoystick = () => {
+    isDraggingJoystick = false; 
+    joyUi.style.display = 'none'; 
+    joystickVector = { x: 0, y: 0 };
+    joyStick.style.transform = `translate(-50%, -50%) translate(0px, 0px)`;
+};
+canvas.addEventListener('touchend', resetJoystick);
+canvas.addEventListener('touchcancel', resetJoystick);
+
+function updateJoystick(tx, ty) {
+    let dx = tx - joyCenter.x; let dy = ty - joyCenter.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > maxJoyDist) { dx = (dx / dist) * maxJoyDist; dy = (dy / dist) * maxJoyDist; }
+    joyStick.style.transform = `translate(-50%, -50%) translate(${dx}px, ${dy}px)`;
+    joystickVector.x = dx / maxJoyDist; joystickVector.y = dy / maxJoyDist;
+}
+
+function getDistance(x1, y1, x2, y2) { return Math.hypot(x2 - x1, y2 - y1); }
+function randRange(min, max) { return Math.random() * (max - min) + min; }
+function getRandomElement(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+class BasicBullet {
+    constructor(x, y, targetX, targetY, damage) {
+        this.x = x; this.y = y; this.damage = damage; this.radius = 4; this.active = true;
+        const angle = Math.atan2(targetY - y, targetX - x);
+        this.vx = Math.cos(angle) * 450; this.vy = Math.sin(angle) * 450;
+    }
+    update(dt) {
+        if (!this.active) return;
+        this.x += this.vx * dt; this.y += this.vy * dt;
+        for (let e of enemies) {
+            if (getDistance(this.x, this.y, e.x, e.y) < this.radius + e.radius) {
+                e.takeDamage(this.damage);
+                createHitParticles(this.x, this.y, '#00f2fe', 3);
+                this.active = false; break;
+            }
+        }
+        if (getDistance(this.x, this.y, player.x, player.y) > 800) this.active = false;
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 10; ctx.shadowColor = '#00f2fe'; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+}
+
+class Player {
+    constructor() {
+        this.x = WORLD_SIZE.width / 2; this.y = WORLD_SIZE.height / 2;
+        this.radius = 16; this.speed = 220; this.maxHp = 100; this.hp = this.maxHp;
+        this.level = 1; this.orbitAngle = 0; this.facing = 1;
+        this.isTakingDamage = false;
+        this.basicWeapon = { baseCooldown: 0.8, cooldown: 0.8, timer: 0, baseDamage: 15, damage: 15 };
+        this.weapons = {
+            meteor: { level: 0, count: 0, damage: 30, radius: 100, active: false },
+            lightning: { level: 0, cooldown: 1.5, timer: 0, damage: 45, chains: 2, active: false },
+            firestorm: { level: 0, cooldown: 2.0, timer: 0, damage: 25, active: false },
+            shockwave: { level: 0, cooldown: 3.0, timer: 0, damage: 60, maxRadius: 250, active: false }
+        };
+    }
+    update(dt) {
+        let dx = 0, dy = 0;
+        if (keys.w || keys.ArrowUp) dy -= 1; if (keys.s || keys.ArrowDown) dy += 1;
+        if (keys.a || keys.ArrowLeft) dx -= 1; if (keys.d || keys.ArrowRight) dx += 1;
+        if (dx === 0 && dy === 0) { dx = joystickVector.x; dy = joystickVector.y; }
+
+        if (dx !== 0 || dy !== 0) {
+            const len = Math.hypot(dx, dy); dx /= len; dy /= len;
+            this.x += dx * this.speed * dt; this.y += dy * this.speed * dt;
+            this.facing = dx > 0 ? 1 : (dx < 0 ? -1 : this.facing);
+        }
+
+        this.x = Math.max(this.radius, Math.min(WORLD_SIZE.width - this.radius, this.x));
+        this.y = Math.max(this.radius, Math.min(WORLD_SIZE.height - this.radius, this.y));
+        this.orbitAngle += dt * 3; 
+
+        const lvlBoost = Math.floor((this.level - 1) / 2);
+        this.basicWeapon.damage = this.basicWeapon.baseDamage + (lvlBoost * 5);
+        this.basicWeapon.cooldown = Math.max(0.1, this.basicWeapon.baseCooldown * Math.pow(0.9, lvlBoost));
+
+        this.basicWeapon.timer += dt;
+        if (this.basicWeapon.timer >= this.basicWeapon.cooldown) {
+            this.basicWeapon.timer = 0;
+            if(enemies.length > 0) {
+                let nearest = null, minDist = Infinity;
+                enemies.forEach(e => { const d = getDistance(this.x, this.y, e.x, e.y); if(d < minDist){ minDist=d; nearest=e; }});
+                if(nearest) projectiles.push(new BasicBullet(this.x, this.y, nearest.x, nearest.y, this.basicWeapon.damage));
+            }
+        }
+        this.updateWeapons(dt);
+        
+        if (!this.isTakingDamage && this.hp < this.maxHp && this.hp > 0) {
+            this.hp = Math.min(this.maxHp, this.hp + 5 * dt);
+        }
+        this.isTakingDamage = false;
+
+        uiHp.innerText = Math.max(0, Math.floor(this.hp));
+        uiMaxHp.innerText = this.maxHp;
+    }
+
+    updateWeapons(dt) {
+        if (this.weapons.meteor.active) {
+            const w = this.weapons.meteor;
+            const count = w.count + (w.level > 1 ? Math.floor(w.level / 2) : 0);
+            const radius = w.radius + w.level * 10;
+            const dmg = w.damage + w.level * 10;
+            for (let i = 0; i < count; i++) {
+                const mx = this.x + Math.cos(this.orbitAngle + (i*Math.PI*2)/count) * radius;
+                const my = this.y + Math.sin(this.orbitAngle + (i*Math.PI*2)/count) * radius;
+                particles.push(new TrailParticle(mx, my, '#00ffff'));
+                enemies.forEach(e => {
+                    if (getDistance(mx, my, e.x, e.y) < 20 + e.radius && Math.random() < 0.2) {
+                        e.takeDamage(dmg * dt * 10); createHitParticles(e.x, e.y, '#00ffff', 2);
+                    }
+                });
+            }
+        }
+        if (this.weapons.lightning.active) {
+            this.weapons.lightning.timer += dt;
+            if (this.weapons.lightning.timer >= Math.max(0.5, this.weapons.lightning.cooldown - this.weapons.lightning.level * 0.1)) {
+                this.weapons.lightning.timer = 0; this.fireLightning();
+            }
+        }
+        if (this.weapons.firestorm.active) {
+            this.weapons.firestorm.timer += dt;
+            if (this.weapons.firestorm.timer >= Math.max(0.8, this.weapons.firestorm.cooldown - this.weapons.firestorm.level * 0.15)) {
+                this.weapons.firestorm.timer = 0; this.fireFirestorm();
+            }
+        }
+        if (activeShockwaveBurstTimer > 0) {
+            activeShockwaveBurstTimer -= dt;
+            if (Math.random() < 0.3) projectiles.push(new ShockwaveEffect(this.x, this.y, 320, 80));
+        }
+        if (this.weapons.shockwave.active) {
+            this.weapons.shockwave.timer += dt;
+            if (this.weapons.shockwave.timer >= Math.max(1.2, this.weapons.shockwave.cooldown - this.weapons.shockwave.level * 0.2)) {
+                this.weapons.shockwave.timer = 0;
+                projectiles.push(new ShockwaveEffect(this.x, this.y, this.weapons.shockwave.maxRadius + this.weapons.shockwave.level * 30, this.weapons.shockwave.damage + this.weapons.shockwave.level * 20));
+            }
+        }
+    }
+    
+    fireLightning() {
+        if(enemies.length === 0) return;
+        const dmg = this.weapons.lightning.damage + this.weapons.lightning.level * 15;
+        let chainsLeft = this.weapons.lightning.chains + this.weapons.lightning.level;
+        let currentTarget = null, minDist = Infinity;
+        enemies.forEach(e => { const d = getDistance(this.x, this.y, e.x, e.y); if (d < minDist) { minDist = d; currentTarget = e; }});
+        if(!currentTarget) return;
+        let origin = { x: this.x, y: this.y }, hitEnemies = new Set(), strikePoints = [origin];
+        while (chainsLeft > 0 && currentTarget) {
+            hitEnemies.add(currentTarget); strikePoints.push({ x: currentTarget.x, y: currentTarget.y });
+            currentTarget.takeDamage(dmg); origin = currentTarget; chainsLeft--; currentTarget = null; minDist = 400;
+            enemies.forEach(e => { if (!hitEnemies.has(e)) { const d = getDistance(origin.x, origin.y, e.x, e.y); if (d < minDist) { minDist = d; currentTarget = e; }}});
+        }
+        projectiles.push(new LightningStrike(strikePoints));
+    }
+
+    fireFirestorm() {
+        if(enemies.length === 0) return;
+        const numFireballs = 1 + Math.floor(this.weapons.firestorm.level / 2);
+        const dmg = this.weapons.firestorm.damage + this.weapons.firestorm.level * 8;
+        const poolRad = 60 + this.weapons.firestorm.level * 15;
+        for (let i = 0; i < numFireballs; i++) {
+            const target = getRandomElement(enemies);
+            if (target) setTimeout(() => projectiles.push(new Fireball(this.x, this.y, target.x, target.y, dmg, poolRad)), i * 150);
+        }
+    }
+
+    takeDamage(amount) {
+        this.isTakingDamage = true;
+        this.hp -= amount;
+        if (this.hp <= 0 && gameState === 'PLAYING') endGame(false);
+    }
+
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y);
+        if (this.weapons.meteor.active) {
+            ctx.shadowBlur = 20; ctx.shadowColor = '#00ffff'; ctx.fillStyle = '#ccffff';
+            const w = this.weapons.meteor;
+            const count = w.count + (w.level > 1 ? Math.floor(w.level / 2) : 0);
+            const radius = w.radius + w.level * 10;
+            for (let i = 0; i < count; i++) {
+                const angle = this.orbitAngle + (i * Math.PI * 2) / count;
+                const mx = Math.cos(angle) * radius, my = Math.sin(angle) * radius;
+                ctx.beginPath();
+                for(let j=0; j<6; j++) {
+                    const sa = angle + (j*Math.PI/3) + this.orbitAngle*5;
+                    ctx.lineTo(mx + Math.cos(sa)*15, my + Math.sin(sa)*15); ctx.lineTo(mx + Math.cos(sa+Math.PI/6)*8, my + Math.sin(sa+Math.PI/6)*8);
+                }
+                ctx.closePath(); ctx.fill();
+            }
+        }
+        ctx.rotate(this.facing === 1 ? Math.PI / 2 : -Math.PI / 2);
+        ctx.shadowBlur = 20; ctx.shadowColor = '#00f2fe'; ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.moveTo(0, -this.radius * 1.2); ctx.lineTo(this.radius, this.radius); ctx.lineTo(0, this.radius * 0.5); ctx.lineTo(-this.radius, this.radius); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    }
+}
+
+class Enemy {
+    constructor(x, y, hp, speed, damage, color, type = 'square') {
+        this.x = x; this.y = y; this.maxHp = hp; this.hp = hp; this.speed = speed; this.damage = damage; this.color = color; this.type = type;
+        this.radius = type === 'boss' ? 24 : 14; this.flash = 0;
+    }
+    update(dt) {
+        const dx = player.x - this.x, dy = player.y - this.y, dist = Math.hypot(dx, dy);
+        let vx = 0, vy = 0; if (dist > 0) { vx = (dx / dist) * this.speed; vy = (dy / dist) * this.speed; }
+        for (let i = 0; i < enemies.length; i++) {
+            if (enemies[i] === this) continue;
+            const d = getDistance(this.x, this.y, enemies[i].x, enemies[i].y);
+            if (d < this.radius * 2) {
+                const pushStr = (this.radius * 2 - d) * 2;
+                this.x -= (enemies[i].x - this.x) / d * pushStr * dt; this.y -= (enemies[i].y - this.y) / d * pushStr * dt;
+            }
+        }
+        this.x += vx * dt; this.y += vy * dt;
+        if (getDistance(this.x, this.y, player.x, player.y) < this.radius + player.radius) player.takeDamage(this.damage * dt);
+    }
+    takeDamage(amount) {
+        this.hp -= amount; this.flash = 0.1;
+        floatingTexts.push({ x: this.x + randRange(-15, 15), y: this.y - 20, text: Math.floor(amount), life: 0.8, color: '#fff' });
+        if (this.hp <= 0) {
+            const idx = enemies.indexOf(this); if (idx > -1) enemies.splice(idx, 1);
+            kills++; uiKills.innerText = kills;
+            createHitParticles(this.x, this.y, this.color, this.type === 'boss' ? 25 : 8);
+        }
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+        ctx.strokeStyle = this.color; ctx.fillStyle = this.flash > 0 ? '#fff' : '#111';
+        if(this.flash > 0) this.flash -= 0.016; 
+        ctx.lineWidth = 2; ctx.beginPath();
+        if (this.type === 'square') { ctx.rect(-this.radius, -this.radius, this.radius*2, this.radius*2); } 
+        else if (this.type === 'triangle') { ctx.moveTo(0, -this.radius); ctx.lineTo(this.radius, this.radius); ctx.lineTo(-this.radius, this.radius); ctx.closePath(); } 
+        else if (this.type === 'boss') { ctx.arc(0, 0, this.radius, 0, Math.PI*2); ctx.moveTo(0, -this.radius); ctx.lineTo(0, this.radius); ctx.moveTo(-this.radius, 0); ctx.lineTo(this.radius, 0); }
+        ctx.fill(); ctx.stroke();
+        if (this.type === 'boss' && this.hp < this.maxHp) {
+            ctx.fillStyle = '#333'; ctx.fillRect(-this.radius, -this.radius - 10, this.radius * 2, 4);
+            ctx.fillStyle = '#f00'; ctx.fillRect(-this.radius, -this.radius - 10, (this.radius * 2) * (this.hp / this.maxHp), 4);
+        }
+        ctx.restore();
+    }
+}
+
+class ShockwaveEffect {
+    constructor(x, y, maxRad, dmg) { this.x=x; this.y=y; this.rad=10; this.maxRad=maxRad; this.dmg=dmg; this.hit=new Set(); this.active=true; }
+    update(dt) {
+        if(!this.active) return; this.rad += 500*dt;
+        enemies.forEach(e => {
+            if(!this.hit.has(e)) {
+                const dist = getDistance(this.x, this.y, e.x, e.y);
+                if(dist <= this.rad || Math.abs(dist - this.rad) < 30) {
+                    e.takeDamage(this.dmg); this.hit.add(e); createHitParticles(e.x, e.y, '#ffee00', 5);
+                    const ang = Math.atan2(e.y - this.y, e.x - this.x); e.x += Math.cos(ang)*40; e.y += Math.sin(ang)*40;
+                }
+            }
+        });
+        if(this.rad >= this.maxRad) this.active = false;
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); const a = Math.max(0, 1-(this.rad/this.maxRad));
+        ctx.beginPath(); ctx.arc(0,0,this.rad,0,Math.PI*2); ctx.strokeStyle = `rgba(255,238,0,${a})`; ctx.lineWidth=12; ctx.shadowBlur=25; ctx.shadowColor='#ffee00'; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,Math.max(0,this.rad-15),0,Math.PI*2); ctx.strokeStyle = `rgba(255,255,255,${a*0.8})`; ctx.lineWidth=4; ctx.stroke();
+        ctx.restore();
+    }
+}
+
+class LightningStrike {
+    constructor(points) {
+        this.life = 0.3; this.maxLife = 0.3; this.active = true; this.jpts = [];
+        for(let i=0; i<points.length-1; i++){
+            this.jpts.push(points[i]); const steps = Math.max(1, Math.floor(getDistance(points[i].x,points[i].y,points[i+1].x,points[i+1].y)/30));
+            for(let j=1; j<steps; j++) this.jpts.push({ x: points[i].x + (points[i+1].x-points[i].x)*(j/steps) + randRange(-20,20), y: points[i].y + (points[i+1].y-points[i].y)*(j/steps) + randRange(-20,20) });
+        }
+        this.jpts.push(points[points.length-1]);
+    }
+    update(dt) { this.life -= dt; this.active = this.life > 0; }
+    draw(ctx) {
+        ctx.save(); ctx.globalAlpha = Math.max(0, this.life/this.maxLife); ctx.beginPath(); ctx.moveTo(this.jpts[0].x, this.jpts[0].y);
+        for(let i=1; i<this.jpts.length; i++) ctx.lineTo(this.jpts[i].x, this.jpts[i].y);
+        ctx.lineJoin='round'; ctx.shadowBlur=30; ctx.shadowColor='#b500ff'; ctx.strokeStyle='#e085ff'; ctx.lineWidth=6; ctx.stroke();
+        ctx.shadowBlur=0; ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.stroke(); ctx.restore();
+    }
+}
+
+class Fireball {
+    constructor(sx,sy,tx,ty,dmg,poolRad) {
+        this.x=sx; this.y=sy; this.tx=tx; this.ty=ty; this.dmg=dmg; this.poolRad=poolRad; this.active=true;
+        const ang = Math.atan2(ty-sy, tx-sx); this.vx = Math.cos(ang)*600; this.vy = Math.sin(ang)*600;
+    }
+    update(dt) {
+        if(!this.active) return; particles.push(new Particle(this.x, this.y, '#ff4500'));
+        this.x += this.vx*dt; this.y += this.vy*dt;
+        if(getDistance(this.x,this.y,this.tx,this.ty) < 20) {
+            this.active=false; createHitParticles(this.tx,this.ty,'#ff4500',20); projectiles.push(new FirePool(this.tx,this.ty,this.poolRad,this.dmg));
+        }
+    }
+    draw(ctx) {
+        ctx.save(); ctx.translate(this.x, this.y); ctx.shadowBlur=20; ctx.shadowColor='#ff4500'; ctx.fillStyle='#ffaa00'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+}
+
+class FirePool {
+    constructor(x,y,rad,dmg) { this.x=x; this.y=y; this.rad=rad; this.dmg=dmg; this.life=3; this.maxLife=3; this.active=true; this.type='firepool'; }
+    update(dt) {
+        if(!this.active) return; this.life -= dt; if(this.life <= 0) { this.active=false; return; }
+        enemies.forEach(e => { if(getDistance(this.x,this.y,e.x,e.y) < this.rad+e.radius) e.takeDamage(this.dmg*dt); });
+        if(Math.random()<0.3) particles.push(new Particle(this.x+randRange(-this.rad,this.rad), this.y+randRange(-this.rad,this.rad), '#ff4500'));
+    }
+    draw(ctx) {
+        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.translate(this.x,this.y); const a = Math.min(1,this.life)*0.5;
+        const grad = ctx.createRadialGradient(0,0,0,0,0,this.rad); grad.addColorStop(0,`rgba(255,170,0,${a})`); grad.addColorStop(0.5,`rgba(255,69,0,${a*0.6})`); grad.addColorStop(1,'rgba(255,0,0,0)');
+        ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(0,0,this.rad,0,Math.PI*2); ctx.fill(); ctx.restore();
+    }
+}
+
+class TrailParticle {
+    constructor(x,y,c) { this.x=x; this.y=y; this.c=c; this.life=0.2; this.maxLife=0.2; }
+    update(dt) { this.life-=dt; return this.life>0; }
+    draw(ctx) { ctx.globalAlpha=Math.max(0,this.life/this.maxLife); ctx.fillStyle=this.c; ctx.beginPath(); ctx.arc(this.x,this.y,4,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1.0; }
+}
+
+class Particle {
+    constructor(x,y,c) {
+        this.x=x; this.y=y; this.c=c; const ang=Math.random()*Math.PI*2; const spd=randRange(50,200);
+        this.vx=Math.cos(ang)*spd; this.vy=Math.sin(ang)*spd; this.life=randRange(0.3,0.6); this.maxLife=this.life; this.size=randRange(2,5);
+    }
+    update(dt) { this.x+=this.vx*dt; this.y+=this.vy*dt; this.vx*=0.95; this.vy*=0.95; this.life-=dt; return this.life>0; }
+    draw(ctx) { ctx.globalAlpha=Math.max(0,this.life/this.maxLife); ctx.fillStyle=this.c; ctx.shadowBlur=10; ctx.shadowColor=this.c; ctx.beginPath(); ctx.arc(this.x,this.y,this.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1.0; ctx.shadowBlur=0; }
+}
+
+function createHitParticles(x, y, color, count) { for (let i=0; i<count; i++) particles.push(new Particle(x, y, color)); }
+
+function startGame(lang = 'zh') {
+    currentLang = lang; gameState = 'PLAYING';
+    modalContainer.classList.add('hidden'); startScreen.classList.add('hidden'); gameoverScreen.classList.add('hidden'); levelupScreen.classList.add('hidden');
+    
+    const isEn = lang === 'en';
+    document.title = isEn ? TopicConfig.titleEn : TopicConfig.titleZh;
+    
+    // 中英文與手機版面的「等級」文字切換
+    document.getElementById('lbl-level-desktop').innerText = isEn ? 'LEVEL' : '系統評級';
+    document.getElementById('lbl-level-mobile').innerText = isEn ? 'LV' : '等級';
+    document.getElementById('lbl-end-level-desktop').innerText = isEn ? 'System Rating' : '系統評級';
+    document.getElementById('lbl-end-level-mobile').innerText = isEn ? 'Level' : '等級';
+
+    document.getElementById('lbl-meteor').innerText = isEn ? 'Meteor' : '流星';
+    document.getElementById('lbl-lightning').innerText = isEn ? 'Lightning' : '閃電';
+    document.getElementById('lbl-firestorm').innerText = isEn ? 'Fire' : '火燒';
+    document.getElementById('lbl-shockwave').innerText = isEn ? 'Shockwave' : '衝擊波';
+    document.getElementById('lbl-quiz-title').innerText = isEn ? 'MIND TRIAL: LEVEL UP!' : '心智試煉 LEVEL UP!';
+    document.getElementById('lbl-quiz-desc').innerText = isEn ? 'Select correct steps within 30s! Get 3/3 right to choose your reward!' : '30秒內選出正確概念步驟！向下滑動作答，三題全對即可選擇專屬獎勵！';
+    document.getElementById('lbl-end-time').innerText = isEn ? 'Survival Time' : '存活時間';
+    document.getElementById('lbl-end-kills').innerText = isEn ? 'Entities Defeated' : '消滅實體';
+
+    player = new Player(); enemies = []; particles = []; projectiles = []; floatingTexts = [];
+    kills = 0; gameTime = 0; timeSinceLastQuiz = 0;
+    uiKills.innerText = kills; uiLevel.innerText = player.level; expBar.style.width = '0%';
+    ['progress-meteor', 'progress-lightning', 'progress-firestorm', 'progress-shockwave'].forEach(id => { document.getElementById(id).style.width = '0%'; });
+    
+    lastTime = performance.now(); cancelAnimationFrame(animationFrameId); animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function endGame(win = false) {
+    gameState = 'GAMEOVER';
+    modalContainer.classList.remove('hidden'); gameoverScreen.classList.remove('hidden'); startScreen.classList.add('hidden'); levelupScreen.classList.add('hidden');
+    const titleEl = document.getElementById('end-title'); const isEn = currentLang === 'en';
+    if (win) {
+        titleEl.innerText = 'SYSTEM CONQUERED'; titleEl.className = 'text-5xl md:text-6xl font-black text-cyan-400 mb-4 drop-shadow-[0_0_15px_rgba(0,255,255,0.8)]';
+        document.getElementById('end-desc').innerText = isEn ? 'You survived and mastered the trials!' : '你解開了所有的封印，成功生還！';
+    } else {
+        titleEl.innerText = 'SYSTEM FAILURE'; titleEl.className = 'text-5xl md:text-6xl font-black text-red-500 mb-4 drop-shadow-[0_0_15px_rgba(255,0,0,0.8)]';
+        document.getElementById('end-desc').innerText = isEn ? 'Overwhelmed by entities...' : '洪流吞噬了你，邏輯運算終止...';
+    }
+    const m = Math.floor(gameTime / 60000), s = Math.floor((gameTime % 60000) / 1000);
+    document.getElementById('end-time').innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    document.getElementById('end-kills').innerText = kills; document.getElementById('end-level').innerText = player.level;
+}
+
+function spawnEnemies(dt) {
+    const minutes = gameTime / 60000;
+    const lvlMult = 1 + (player.level - 1) * 0.35; 
+    if (Math.random() < (3 + minutes * 3) * lvlMult * dt) {
+        const ang = Math.random() * Math.PI * 2, dist = Math.max(canvas.width, canvas.height) / 2 + 100;
+        const ex = player.x + Math.cos(ang)*dist, ey = player.y + Math.sin(ang)*dist;
+        const hp = (20 + (minutes * 30)) * lvlMult, spd = (80 + (minutes * 10)) * (1 + (player.level - 1) * 0.08), dmg = (10 + (minutes * 4)) * lvlMult;
+        let type = 'square', color = '#ff0055';
+        if (minutes > 1.5 && Math.random() > 0.6) { type = 'triangle'; color = '#aa00ff'; }
+        if (minutes > 3 && Math.random() > 0.7) color = '#ffaa00';
+        if (Math.random() < (0.03 * minutes + (player.level * 0.01))) {
+            enemies.push(new Enemy(ex, ey, hp * 6, spd * 0.85, dmg * 2, '#ff0000', 'boss'));
+        } else {
+            enemies.push(new Enemy(ex, ey, hp, spd, dmg, color, type));
+        }
+    }
+}
+
+function gameLoop(timestamp) {
+    if (gameState !== 'PLAYING') return;
+    const dt = Math.min((timestamp - lastTime) / 1000, 0.1); lastTime = timestamp;
+    gameTime += dt * 1000; timeSinceLastQuiz += dt * 1000;
+    expBar.style.width = `${Math.min(100, (timeSinceLastQuiz / QUIZ_INTERVAL) * 100)}%`;
+
+    if (timeSinceLastQuiz >= QUIZ_INTERVAL) { timeSinceLastQuiz = 0; triggerLevelUpQuiz(); return; }
+
+    const m = Math.floor(gameTime / 60000), s = Math.floor((gameTime % 60000) / 1000);
+    uiTimer.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    if (gameTime >= GAME_DURATION) { endGame(true); return; }
+
+    player.update(dt);
+    camera.x += ((player.x - canvas.width / 2) - camera.x) * 10 * dt; camera.y += ((player.y - canvas.height / 2) - camera.y) * 10 * dt;
+    spawnEnemies(dt); enemies.forEach(e => e.update(dt));
+    
+    for(let i=particles.length-1; i>=0; i--) if(!particles[i].update(dt)) particles.splice(i,1);
+    for(let i=projectiles.length-1; i>=0; i--) { const p = projectiles[i]; if(p.update) { p.update(dt); if(p.active===false) projectiles.splice(i,1); } }
+    for(let i=floatingTexts.length-1; i>=0; i--) { floatingTexts[i].life-=dt; floatingTexts[i].y-=30*dt; if(floatingTexts[i].life<=0) floatingTexts.splice(i,1); }
+
+    ctx.fillStyle = '#050510'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.save(); ctx.translate(-camera.x, -camera.y);
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.07)'; ctx.lineWidth = 1; const grid = 150;
+    ctx.beginPath();
+    for (let x = Math.floor(camera.x/grid)*grid; x < camera.x+canvas.width; x+=grid) { ctx.moveTo(x, camera.y); ctx.lineTo(x, camera.y+canvas.height); }
+    for (let y = Math.floor(camera.y/grid)*grid; y < camera.y+canvas.height; y+=grid) { ctx.moveTo(camera.x, y); ctx.lineTo(camera.x+canvas.width, y); }
+    ctx.stroke();
+
+    projectiles.forEach(p => { if(p.type === 'firepool') p.draw(ctx); });
+    projectiles.forEach(p => { if(p.type !== 'firepool') p.draw(ctx); });
+    enemies.forEach(e => e.draw(ctx)); player.draw(ctx); particles.forEach(p => p.draw(ctx));
+
+    ctx.font = 'bold 20px "Inter", sans-serif'; ctx.textAlign = 'center';
+    floatingTexts.forEach(ft => { ctx.shadowBlur=5; ctx.shadowColor='#000'; ctx.fillStyle=`rgba(255,255,255,${ft.life})`; ctx.fillText(ft.text, ft.x, ft.y); ctx.shadowBlur=0; });
+    ctx.restore();
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+function triggerLevelUpQuiz() {
+    gameState = 'LEVELUP'; modalContainer.classList.remove('hidden'); startScreen.classList.add('hidden'); gameoverScreen.classList.add('hidden'); levelupScreen.classList.remove('hidden'); btnContinue.classList.add('hidden', 'fade-in');
+    
+    // 每次開啟時確保還原卡片跟標題，以免被滿分獎勵遮擋後隱藏
+    const qContainer = document.getElementById('quiz-cards-container');
+    qContainer.classList.remove('hidden');
+    document.getElementById('quiz-timer-container').classList.remove('hidden');
+    document.getElementById('lbl-quiz-title').classList.remove('hidden');
+    document.getElementById('lbl-quiz-desc').classList.remove('hidden');
+
+    qContainer.innerHTML = '';
+    currentUpgrades = []; quizResults = [null, null, null]; currentQuizzesData = []; activeQuizzes = 3;
+    
+    for(let i=0; i<3; i++) {
+        let upg = getRandomElement(['meteor', 'lightning', 'firestorm']); currentUpgrades.push(upg);
+        let qData = TopicConfig.generateQuestion(currentLang); currentQuizzesData.push(qData);
+        
+        const card = document.createElement('div'); card.id = `quiz-card-${i}`;
+        // 加入 shrink-0 snap-start 讓手機版的卡片可以獨立填滿並對齊
+        card.className = 'relative p-3 md:p-4 bg-black/60 border-2 rounded-2xl flex flex-col items-center transition-all duration-300 backdrop-blur-md w-full md:w-1/3 shrink-0 snap-start';
+        card.style.borderColor = weaponDetails[upg].color; card.style.boxShadow = `0 0 20px ${weaponDetails[upg].color}40, inset 0 0 10px ${weaponDetails[upg].color}20`;
+
+        const title = document.createElement('div'); title.className = 'text-sm md:text-base font-black mb-2 drop-shadow-md tracking-wider flex items-center gap-2 shrink-0'; title.style.color = weaponDetails[upg].color;
+        title.innerHTML = `<span>${weaponDetails[upg].icon}</span> ${weaponDetails[upg].name} (Lv.${player.weapons[upg].active ? player.weapons[upg].level : 0} &rarr; ${(player.weapons[upg].active ? player.weapons[upg].level : 0)+1})`;
+
+        const qBox = document.createElement('div'); 
+        qBox.className = 'w-full min-h-[140px] flex flex-col items-center justify-center bg-gray-900/90 rounded-lg p-3 mb-3 border border-gray-700 shadow-inner overflow-x-auto text-white font-serif shrink-0';
+        if (qData.svg) { const imgEl = document.createElement('div'); imgEl.innerHTML = qData.svg; imgEl.className = "mb-1 flex justify-center w-full"; qBox.appendChild(imgEl); }
+        const txtEl = document.createElement('div'); katex.render(`\\displaystyle{${qData.question}}`, txtEl, { throwOnError: false, displayMode: true }); qBox.appendChild(txtEl);
+
+        const grid = document.createElement('div'); grid.className = 'grid grid-cols-1 gap-2 w-full mt-auto';
+        qData.options.forEach((opt, optIdx) => {
+            const btn = document.createElement('button'); 
+            btn.className = 'p-3 bg-gray-800 border border-gray-600 rounded-lg transition-all text-white hover:bg-gray-700 hover:border-white shadow-md flex items-center justify-center min-h-[60px] font-serif relative overflow-hidden w-full text-base md:text-lg';
+            katex.render(`\\displaystyle{${opt}}`, btn, { throwOnError: false });
+            btn.onclick = () => handleCardAnswer(i, optIdx === qData.correctIdx, card, btn, grid, qData.correctIdx);
+            grid.appendChild(btn);
+        });
+
+        card.append(title, qBox, grid); qContainer.appendChild(card);
+    }
+
+    quizTimeLeft = 30; quizTimerBar.style.width = '100%'; quizTimerText.innerText = '30s';
+    clearInterval(quizTimerInterval);
+    quizTimerInterval = setInterval(() => {
+        quizTimeLeft--; quizTimerBar.style.width = `${(quizTimeLeft/30)*100}%`; quizTimerText.innerText = `${quizTimeLeft}s`;
+        if (quizTimeLeft <= 10) { quizTimerBar.classList.add('from-red-600', 'to-orange-500'); quizTimerBar.classList.remove('from-fuchsia-600', 'to-pink-500'); quizTimerText.classList.add('text-red-300', 'animate-ping'); }
+        else { quizTimerBar.classList.add('from-fuchsia-600', 'to-pink-500'); quizTimerBar.classList.remove('from-red-600', 'to-orange-500'); quizTimerText.classList.remove('text-red-300', 'animate-ping'); }
+        if (quizTimeLeft <= 0) {
+            clearInterval(quizTimerInterval);
+            for(let i=0; i<3; i++) if(quizResults[i] === null) handleCardAnswer(i, false, document.getElementById(`quiz-card-${i}`), null, document.getElementById(`quiz-card-${i}`).querySelector('.grid'), currentQuizzesData[i].correctIdx, true);
+        }
+    }, 1000);
+}
+
+function handleCardAnswer(index, isCorrect, card, clickedBtn, grid, correctIdx, isTimeout=false) {
+    if (quizResults[index] !== null) return;
+    quizResults[index] = isCorrect; activeQuizzes--;
+    grid.querySelectorAll('button').forEach((b, i) => {
+        b.disabled = true; b.classList.remove('hover:bg-gray-700', 'hover:border-white');
+        if (i === correctIdx) b.classList.add('bg-green-600/50', 'border-green-400', 'shadow-[0_0_15px_rgba(74,222,128,0.5)]');
+        else if (b === clickedBtn && !isCorrect) b.classList.add('bg-red-600/50', 'border-red-500', 'shadow-[0_0_15px_rgba(239,68,68,0.5)]');
+        else b.classList.add('opacity-40');
+    });
+
+    const stamp = document.createElement('div'); stamp.className = 'absolute -top-3 -right-3 text-4xl drop-shadow-[0_0_10px_rgba(0,0,0,0.8)] z-20 animate-bounce';
+    if (isCorrect) { stamp.innerHTML = '✅'; applyUpgrades([currentUpgrades[index]]); card.style.borderColor = '#4ade80'; card.style.boxShadow = '0 0 20px rgba(74, 222, 128, 0.4)'; }
+    else { stamp.innerHTML = isTimeout ? '⌛' : '❌'; card.style.borderColor = '#ef4444'; card.style.boxShadow = '0 0 20px rgba(239, 68, 68, 0.4)'; }
+    card.appendChild(stamp);
+    if (activeQuizzes <= 0) endQuizPhase();
+}
+
+function applyUpgrades(upgrades) {
+    upgrades.forEach(u => {
+        if (!player.weapons[u].active) { player.weapons[u].active = true; player.weapons[u].level = 1; if(u === 'meteor') player.weapons[u].count = 1; } 
+        else player.weapons[u].level++;
+        const uiBar = document.getElementById(weaponDetails[u].uiId);
+        if(uiBar) uiBar.style.width = `${Math.min(100, (player.weapons[u].level / 10) * 100)}%`;
+    });
+}
+
+function endQuizPhase() {
+    clearInterval(quizTimerInterval); player.level++; uiLevel.innerText = player.level;
+    const isEn = currentLang === 'en';
+    if (quizResults.filter(r => r === true).length === 3) {
+        // 隱藏背後的雜亂元素，使得只剩下選項
+        document.getElementById('quiz-cards-container').classList.add('hidden');
+        document.getElementById('quiz-timer-container').classList.add('hidden');
+        document.getElementById('lbl-quiz-title').classList.add('hidden');
+        document.getElementById('lbl-quiz-desc').classList.add('hidden');
+
+        const overlay = document.getElementById('perfect-reward-overlay');
+        document.getElementById('lbl-perfect-desc').innerText = isEn ? 'Select your trial reward:' : '請選擇你的試煉回報：';
+        document.getElementById('lbl-heal-title').innerText = isEn ? 'Restore 20 HP' : '回復 20 生命值';
+        document.getElementById('lbl-heal-sub').innerText = isEn ? 'Heal player by +20' : '補滿部分體力';
+        document.getElementById('lbl-shockwave-title').innerText = isEn ? '2s Shockwave Burst' : '2秒暴風衝擊波';
+        document.getElementById('lbl-shockwave-sub').innerText = isEn ? 'Continuous blast wave' : '持續推開擊退強敵';
+        overlay.classList.remove('hidden');
+
+        const resumeBattle = () => { overlay.classList.add('hidden'); levelupScreen.classList.add('hidden'); modalContainer.classList.add('hidden'); gameState = 'PLAYING'; lastTime = performance.now(); animationFrameId = requestAnimationFrame(gameLoop); };
+        document.getElementById('btn-reward-heal').onclick = () => { player.hp = Math.min(player.maxHp, player.hp + 20); floatingTexts.push({ x: player.x, y: player.y - 40, text: isEn ? '+20 HP RESTORED!' : '+20 生命值回復！', life: 2.5, color: '#4ade80' }); resumeBattle(); };
+        document.getElementById('btn-reward-shockwave').onclick = () => { activeShockwaveBurstTimer = 2.0; floatingTexts.push({ x: player.x, y: player.y - 40, text: isEn ? '2S SHOCKWAVE BURST!' : '2秒暴風衝擊波發動！', life: 2.5, color: '#ffee00' }); resumeBattle(); };
+    } else {
+        btnContinue.classList.remove('hidden'); btnContinue.classList.add('fade-in');
+    }
+}
+
+btnStartZh.addEventListener('click', () => startGame('zh'));
+btnStartEn.addEventListener('click', () => startGame('en'));
+btnRestart.addEventListener('click', () => startGame(currentLang));
+btnContinue.addEventListener('click', () => { levelupScreen.classList.add('hidden'); modalContainer.classList.add('hidden'); gameState = 'PLAYING'; lastTime = performance.now(); animationFrameId = requestAnimationFrame(gameLoop); });
+
+</script>
+</body>
+</html>
